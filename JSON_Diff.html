@@ -1,0 +1,1434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JSON Diff</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Archivo:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="tools.css">
+<style>
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .app {
+    min-height: calc(100dvh - 58px);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+    max-width: 1500px;
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+  }
+  h1 {
+    font-family: 'Newsreader', serif;
+    font-size: 22px;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    margin: 0 auto 0 0;
+    color: var(--ink);
+  }
+  .controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  button, select {
+    font: inherit;
+    font-size: 13px;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--ink);
+    border-radius: 999px;
+    padding: 6px 14px;
+    cursor: pointer;
+    min-height: 32px;
+    line-height: 1.2;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  select {
+    background: var(--panel);
+  }
+  button:hover:not(:disabled) {
+    background: var(--ink);
+    color: var(--bg);
+  }
+  select:hover {
+    border-color: var(--accent);
+  }
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  button:disabled:hover {
+    background: transparent;
+    color: var(--ink);
+  }
+  button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  button:active:not(:disabled) {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+  button.primary {
+    background: var(--ink);
+    border: 1px solid var(--ink);
+    color: var(--bg);
+    font-weight: 500;
+  }
+  button.primary:hover:not(:disabled) {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+  button.primary:active:not(:disabled) {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+  button.primary:disabled:hover {
+    background: var(--ink);
+    color: var(--bg);
+  }
+  .hint {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .hint.kbd {
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 800px) { .inputs { grid-template-columns: 1fr; } .hint.kbd { display: none; } }
+
+  .pane {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 42px;
+    padding: 6px 12px 6px 14px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--line);
+    font-weight: 500;
+    font-size: 14px;
+  }
+  .pane-head .meta {
+    font-family: var(--mono);
+    color: var(--muted);
+    font-weight: 400;
+    font-size: 12px;
+    margin-left: 8px;
+  }
+  .badge {
+    display: inline-block;
+    min-width: 20px;
+    padding: 0 7px;
+    margin-right: 8px;
+    border-radius: 4px;
+    font: 600 12px/20px var(--mono);
+    text-align: center;
+  }
+  .badge.a { background: var(--rem-bg); color: var(--rem-ink); }
+  .badge.b { background: var(--add-bg); color: var(--add-ink); }
+  textarea.src {
+    display: block;
+    width: 100%;
+    height: 210px;
+    min-height: 90px;
+    margin: 0;
+    border: 0;
+    padding: 12px 14px;
+    resize: vertical;
+    background: transparent;
+    color: var(--ink);
+    font: 13px/1.55 var(--mono);
+    tab-size: 2;
+    white-space: pre;
+    overflow: auto;
+  }
+  textarea.src::placeholder { color: var(--muted); }
+  .err {
+    display: none;
+    margin: 0;
+    padding: 9px 14px;
+    background: var(--err-bg);
+    color: var(--err);
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+  .err.show { display: block; }
+
+  .opts {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding: 10px 14px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .opts label { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-2); }
+  .opts select, .opts input[type="text"] {
+    min-height: 32px;
+    padding: 3px 10px;
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--line);
+  }
+  .opts select { border-radius: 999px; }
+  .opts input[type="text"] { border-radius: 4px; }
+  .opts input.keyname { width: 110px; font-family: var(--mono); }
+  .opts input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+  .opts .sp { margin-left: auto; }
+
+  .results {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: clip;
+  }
+  .results[hidden] { display: none; }
+  .summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--line);
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 32px;
+    padding: 3px 12px;
+    font-size: 13px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    cursor: pointer;
+    transition: none;
+  }
+  .chip b { font-family: var(--mono); font-weight: 600; }
+  .chip[aria-pressed="false"] { opacity: 0.5; text-decoration: line-through; text-decoration-color: transparent; }
+  .chip.changed { color: var(--chg); }
+  .chip.added { color: var(--add-ink); }
+  .chip.removed { color: var(--rem-ink); }
+  .chip.same { color: var(--ink-2); }
+  .chip.changed[aria-pressed="true"] { background: var(--chg-bg); border-color: var(--chg); }
+  .chip.added[aria-pressed="true"] { background: var(--add-bg); border-color: var(--add-ink); }
+  .chip.removed[aria-pressed="true"] { background: var(--rem-bg); border-color: var(--rem-ink); }
+  .chip.same[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--ink-2); }
+  .chip:hover {
+    background: var(--panel-2);
+    color: inherit;
+    border-color: var(--ink-2);
+  }
+  .chip.changed[aria-pressed="true"]:hover { background: var(--chg-bg); border-color: var(--chg); color: var(--chg); }
+  .chip.added[aria-pressed="true"]:hover { background: var(--add-bg); border-color: var(--add-ink); color: var(--add-ink); }
+  .chip.removed[aria-pressed="true"]:hover { background: var(--rem-bg); border-color: var(--rem-ink); color: var(--rem-ink); }
+  .chip.same[aria-pressed="true"]:hover { background: var(--accent-soft); border-color: var(--ink-2); color: var(--ink-2); }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .toolbar input[type="text"] {
+    flex: 1 1 200px;
+    min-width: 0;
+    min-height: 32px;
+    padding: 4px 10px;
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+  }
+  .toolbar input[type="text"]::placeholder { color: var(--muted); }
+  .toolbar button { min-height: 32px; padding: 4px 12px; font-size: 13px; }
+  .seg { display: inline-flex; }
+  .seg button { border-radius: 0; margin-left: -1px; }
+  .seg button:first-child { border-radius: 999px 0 0 999px; margin-left: 0; }
+  .seg button:last-child { border-radius: 0 999px 999px 0; }
+  .seg button:hover, .seg button:focus-visible, .seg button[aria-pressed="true"] { z-index: 1; }
+  button.toggle[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+    font-weight: 500;
+  }
+  button.toggle[aria-pressed="true"]:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+  .banner { padding: 18px 16px; color: var(--ok); font-weight: 500; }
+  .banner.muted { color: var(--ink-2); font-weight: 400; }
+  .note { padding: 8px 14px; font-size: 13px; color: var(--ink-2); border-top: 1px solid var(--line); }
+
+  /* rows */
+  .thead, .row { display: grid; grid-template-columns: minmax(220px, 34%) minmax(0, 1fr) minmax(0, 1fr); }
+  .thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--line);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .thead > div { padding: 7px 12px; }
+  .row { border-bottom: 1px solid var(--line); font-size: 13px; }
+  .row:last-child { border-bottom: 0; }
+  .row > div { padding: 5px 12px; min-width: 0; }
+  .k {
+    font-family: var(--mono);
+    overflow-wrap: anywhere;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    border-left: 3px solid transparent;
+  }
+  .k .lbl { min-width: 0; }
+  .k .full { display: block; color: var(--ink-2); font-size: 11.5px; }
+  .v { font-family: var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .v.empty { color: var(--ink-2); opacity: 0.55; }
+  .v .ty {
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 4px;
+    font: 500 10.5px/16px var(--sans);
+    background: var(--panel-2);
+    color: var(--ink-2);
+    border: 1px solid var(--line);
+  }
+  .s-str { color: var(--t-str); }
+  .s-num { color: var(--t-num); }
+  .s-lit { color: var(--t-lit); }
+  .row.changed > .k { border-left-color: var(--chg); }
+  .row.added > .k { border-left-color: var(--add-ink); }
+  .row.removed > .k { border-left-color: var(--rem-ink); }
+  .row.changed > .va, .row.removed > .va { background: var(--rem-bg); }
+  .row.changed > .vb, .row.added > .vb { background: var(--add-bg); }
+  .row.same > .k { color: var(--ink-2); }
+  mark.hd { color: inherit; border-radius: 3px; padding: 0 1px; }
+  .va mark.hd { background: var(--rem-hl); }
+  .vb mark.hd { background: var(--add-hl); }
+  .row.group { cursor: pointer; background: var(--panel-2); user-select: none; }
+  .row.group:hover { background: var(--accent-soft); }
+  .row.group .k { align-items: center; font-weight: 500; }
+  .row.group .gm {
+    grid-column: 2 / 4;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    color: var(--ink-2);
+  }
+  .caret { flex: none; width: 14px; height: 14px; position: relative; }
+  .caret::before {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 2px;
+    width: 6px;
+    height: 6px;
+    border-right: 1.6px solid currentColor;
+    border-bottom: 1.6px solid currentColor;
+    transform: rotate(-45deg);
+    transition: transform 0.12s;
+  }
+  .row.group.open .caret::before { transform: translate(1px, 1px) rotate(45deg); }
+  .pill { display: inline-block; padding: 0 8px; border-radius: 999px; font: 600 12px/20px var(--mono); }
+  .pill.changed { background: var(--chg-bg); color: var(--chg); }
+  .pill.added { background: var(--add-bg); color: var(--add-ink); }
+  .pill.removed { background: var(--rem-bg); color: var(--rem-ink); }
+  .size { font-size: 12px; }
+  .kids[hidden] { display: none; }
+
+  @media (max-width: 800px) {
+    .thead { display: none; }
+    .row { grid-template-columns: 1fr; }
+    .row.group .gm { grid-column: 1; padding-top: 0; }
+    .row:not(.group) > .va::before, .row:not(.group) > .vb::before {
+      display: block;
+      font: 600 11px/1.6 var(--sans);
+      color: var(--ink-2);
+    }
+    .row:not(.group) > .va::before { content: "A"; }
+    .row:not(.group) > .vb::before { content: "B"; }
+  }
+</style>
+<script src="theme.js"></script>
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header-inner">
+    <a href="index.html" class="site-brand">Jayasuriya <em>MK</em></a>
+    <nav class="site-nav">
+      <a href="index.html" class="site-nav-link">Home</a>
+      <a href="index.html#work" class="site-nav-link">Work</a>
+      <a href="JSON_Formatter.html" class="site-nav-link">Formatter</a>
+      <a href="JSON_Diff.html" class="site-nav-link" aria-current="page">Diff</a>
+      <button type="button" class="site-theme-toggle" data-theme-toggle>
+        <span class="site-toggle-track"><span class="site-toggle-knob"></span></span>
+        <span class="site-toggle-label">Light</span>
+      </button>
+    </nav>
+  </div>
+</header>
+
+<div class="app">
+  <div class="bar">
+    <h1>JSON diff</h1>
+    <div class="controls">
+      <span class="hint kbd">Ctrl/⌘+Enter to compare</span>
+      <button id="example" type="button">Example</button>
+      <button id="swap" type="button" title="Swap A and B">Swap A ⇄ B</button>
+      <button id="clear" type="button">Clear</button>
+      <button id="compare" type="button" class="primary">Compare</button>
+    </div>
+  </div>
+
+  <div class="inputs">
+    <section class="pane" aria-label="JSON A">
+      <div class="pane-head"><span><span class="badge a">A</span>Before<span class="meta" id="metaA"></span></span></div>
+      <textarea class="src" id="inA" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Paste JSON A here. Rust debug output ({:?}) and JSON inside strings are understood too."></textarea>
+      <p class="err" id="errA" role="alert"></p>
+    </section>
+    <section class="pane" aria-label="JSON B">
+      <div class="pane-head"><span><span class="badge b">B</span>After<span class="meta" id="metaB"></span></span></div>
+      <textarea class="src" id="inB" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Paste JSON B here."></textarea>
+      <p class="err" id="errB" role="alert"></p>
+    </section>
+  </div>
+
+  <div class="opts">
+    <label>Arrays
+      <select id="arrMode" aria-label="How to match array items">
+        <option value="index">compare by position</option>
+        <option value="key">match items by key</option>
+        <option value="unordered">ignore order</option>
+      </select>
+    </label>
+    <label id="keyWrap" hidden>Key field <input type="text" class="keyname" id="keyName" value="id" spellcheck="false" autocomplete="off" autocapitalize="off"></label>
+    <label><input type="checkbox" id="expand" checked> Expand JSON inside strings</label>
+    <span class="hint sp">Fields are compared one by one and listed A–Z at every level.</span>
+  </div>
+
+  <section class="results" id="results" hidden aria-label="Differences">
+    <div class="summary" id="summary"></div>
+    <div class="toolbar">
+      <span class="seg" role="group" aria-label="View">
+        <button id="vTree" type="button" class="toggle" aria-pressed="true">Tree</button>
+        <button id="vFlat" type="button" class="toggle" aria-pressed="false">Flat list</button>
+      </span>
+      <input type="text" id="search" placeholder="Filter by field name or value" aria-label="Filter fields" spellcheck="false" autocomplete="off" autocapitalize="off">
+      <button id="expandAll" type="button">Expand all</button>
+      <button id="collapseAll" type="button">Collapse all</button>
+      <button id="copy" type="button">Copy report</button>
+    </div>
+    <div id="list"></div>
+  </section>
+</div>
+
+<footer class="site-footer">
+  <span>© 2026 Jayasuriya MK</span>
+  <span class="site-footer-links">
+    <a href="https://github.com/MKJSM" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://www.linkedin.com/in/jayasuriya-mk" target="_blank" rel="noopener">LinkedIn</a>
+    <span>Rust backend developer</span>
+  </span>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+
+  
+  // Decodes a Rust string literal ("..." with Rust escapes) starting at src[i].
+  // Returns { s: decoded string, end: index after the closing quote }.
+  function decodeRustString(src, i) {
+    var n = src.length, out = "", start = i;
+    i++;
+    while (i < n && src[i] !== '"') {
+      var c = src[i];
+      if (c === "\\") {
+        var d = src[i + 1]; i += 2;
+        if (d === "n") out += "\n";
+        else if (d === "r") out += "\r";
+        else if (d === "t") out += "\t";
+        else if (d === "0") out += "\0";
+        else if (d === "\\" || d === '"' || d === "'") out += d;
+        else if (d === "u") {
+          var m = /^\{([0-9a-fA-F]{1,6})\}/.exec(src.slice(i, i + 9));
+          if (!m) throw new Error("bad \\u escape at character " + i);
+          out += String.fromCodePoint(parseInt(m[1], 16));
+          i += m[0].length;
+        } else if (d === "x") {
+          out += String.fromCharCode(parseInt(src.slice(i, i + 2), 16));
+          i += 2;
+        } else throw new Error("bad escape \\" + d + " at character " + (i - 2));
+      } else { out += c; i++; }
+    }
+    if (i >= n) throw new Error("unterminated string starting at character " + start);
+    return { s: out, end: i + 1 };
+  }
+
+  // Converts the `{:?}` / `{:#?}` output of a serde_json::Value, e.g.
+  //   Some(Object {"a": String("x"), "n": Number(1.5), "l": Array [Null, Bool(true)]})
+  // into JSON text. Number literals are copied verbatim (no precision loss).
+  function debugToJson(src) {
+    var i = 0, n = src.length;
+    function fail(m) { throw new Error(m + " at character " + i); }
+    function ws() {
+      while (i < n) {
+        var c = src.charCodeAt(i);
+        if (c === 32 || c === 10 || c === 13 || c === 9) i++; else break;
+      }
+    }
+    function peek(s) { ws(); return src.slice(i, i + s.length) === s; }
+    function eat(s) { if (!peek(s)) fail("expected '" + s + "'"); i += s.length; }
+    function rustString() {
+      ws();
+      if (src[i] !== '"') fail("expected a string");
+      var r = decodeRustString(src, i);
+      i = r.end;
+      return JSON.stringify(r.s);
+    }
+    function value() {
+      ws();
+      if (peek("Some(")) { eat("Some("); var sv = value(); eat(")"); return sv; }
+      if (peek("None")) { eat("None"); return "null"; }
+      if (peek("Null")) { eat("Null"); return "null"; }
+      if (peek("Bool(")) {
+        eat("Bool(");
+        var b;
+        if (peek("true")) { eat("true"); b = "true"; } else { eat("false"); b = "false"; }
+        eat(")");
+        return b;
+      }
+      if (peek("Number(")) {
+        eat("Number("); ws();
+        var j = i;
+        while (j < n && src[j] !== ")") j++;
+        var num = src.slice(i, j).trim();
+        if (!/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(num)) fail("bad number '" + num + "'");
+        i = j; eat(")");
+        return num;
+      }
+      if (peek("String(")) { eat("String("); var s = rustString(); eat(")"); return s; }
+      if (peek("Array")) {
+        eat("Array"); eat("[");
+        var items = [];
+        while (!peek("]")) {
+          items.push(value());
+          if (peek(",")) eat(","); else break;
+        }
+        eat("]");
+        return "[" + items.join(",") + "]";
+      }
+      if (peek("Object")) {
+        eat("Object"); eat("{");
+        var ent = [];
+        while (!peek("}")) {
+          var k = rustString(); eat(":");
+          ent.push(k + ":" + value());
+          if (peek(",")) eat(","); else break;
+        }
+        eat("}");
+        return "{" + ent.join(",") + "}";
+      }
+      fail("unexpected token");
+    }
+    var res = value(); ws();
+    if (i < n) fail("unexpected trailing text");
+    return res;
+  }
+
+  // Also matches the JSON-escaped form: Some(Object {\"a\": String(\"x\")})
+  var DEBUG_START = /^\s*(?:Some\(\s*)?(?:Object\s*\{|Array\s*\[|String\(\s*\\?"|Number\(|Bool\(|Null\b)/;
+  function looksLikeDebug(s) { return DEBUG_START.test(s); }
+
+  // Raw pasted debug text. Returns null when the text isn't debug output,
+  // throws when it looks like debug output but can't be converted.
+  function tryDebug(text) {
+    if (!looksLikeDebug(text)) return null;
+    try { return debugToJson(text); }
+    catch (e1) {
+      if (text.indexOf('\\"') !== -1) {
+        var unescaped = null;
+        try { unescaped = JSON.parse('"' + text + '"'); } catch (e) {}
+        if (unescaped !== null) { try { return debugToJson(unescaped); } catch (e) {} }
+      }
+      throw e1;
+    }
+  }
+
+  // Walks parsed JSON and swaps string fields that hold either
+  //   - a JSON object/array encoded as a string ("{\"a\": 1}"), or
+  //   - Rust debug output,
+  // for a placeholder; the converted text is spliced back in by splice().
+  // Nested cases (JSON string inside a JSON string, debug inside either) are
+  // expanded recursively. ctx = { texts: [], dbg: 0, json: 0 }.
+  function expandDebug(v, ctx) {
+    if (typeof v === "string") {
+      var t = v.trim(), c = t.charAt(0), e = t.charAt(t.length - 1);
+      if ((c === "{" && e === "}") || (c === "[" && e === "]")) {
+        var inner;
+        try { inner = JSON.parse(protectNumbers(t)); } catch (err) { inner = undefined; }
+        if (inner !== undefined) {
+          var dbgBefore = ctx.dbg, jsonBefore = ctx.json;
+          var sub = expandDebug(inner, ctx);
+          ctx.json++;
+          // Keep the original text (exact numbers) unless something inside changed.
+          var changed = ctx.dbg !== dbgBefore || ctx.json !== jsonBefore + 1;
+          ctx.texts.push(changed ? JSON.stringify(sub) : t);
+          return "@@DBG" + (ctx.texts.length - 1) + "@@";
+        }
+      }
+      if (looksLikeDebug(v)) {
+        try { ctx.texts.push(debugToJson(v)); ctx.dbg++; return "@@DBG" + (ctx.texts.length - 1) + "@@"; } catch (err) {}
+      }
+      return v;
+    }
+    if (Array.isArray(v)) return v.map(function (x) { return expandDebug(x, ctx); });
+    if (v && typeof v === "object") {
+      var o = {};
+      Object.keys(v).forEach(function (k) { o[k] = expandDebug(v[k], ctx); });
+      return o;
+    }
+    return v;
+  }
+
+  // JSON.parse rounds numbers beyond double precision (e.g. 64-bit IDs).
+  // Wrap such literals in a placeholder string so they survive a parse/stringify.
+  function protectNumbers(t) {
+    var out = "", i = 0, n = t.length, num = /-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
+    while (i < n) {
+      var c = t[i];
+      if (c === '"') {
+        var j = i + 1;
+        while (j < n && t[j] !== '"') j += t[j] === "\\" ? 2 : 1;
+        out += t.slice(i, j + 1); i = j + 1;
+      } else if (c === "-" || (c >= "0" && c <= "9")) {
+        num.lastIndex = i;
+        var m = num.exec(t);
+        if (!m) { out += c; i++; continue; }
+        var lit = m[0];
+        out += lit.replace(/\D/g, "").length >= 16 ? '"@@NUM' + lit + '@@"' : lit;
+        i += lit.length;
+      } else { out += c; i++; }
+    }
+    return out;
+  }
+
+  // Replaces placeholders with their converted text, repeating for nesting.
+  function splice(text, ctx) {
+    var prev;
+    do {
+      prev = text;
+      text = text.replace(/"@@DBG(\d+)@@"/g, function (m, d) { return ctx.texts[+d]; });
+    } while (text !== prev);
+    return text.replace(/"@@NUM([^@]+)@@"/g, "$1");
+  }
+
+  // Lenient fallback: {json: 1} -> {"json": 1}. Strings are copied verbatim.
+  function quoteBareKeys(t) {
+    var out = "", i = 0, n = t.length, word = /[A-Za-z_$][\w$-]*/y;
+    while (i < n) {
+      var c = t[i];
+      if (c === '"') {
+        var j = i + 1;
+        while (j < n && t[j] !== '"') j += t[j] === "\\" ? 2 : 1;
+        out += t.slice(i, j + 1); i = j + 1;
+      } else if (/[A-Za-z_$]/.test(c)) {
+        word.lastIndex = i;
+        var w = word.exec(t)[0], k = i + w.length;
+        while (k < n && /\s/.test(t[k])) k++;
+        out += t[k] === ":" ? '"' + w + '"' : w;
+        i += w.length;
+      } else { out += c; i++; }
+    }
+    return out;
+  }
+  // Converts Rust *derived* Debug output and logfmt-style `key=value` pairs to
+  // JSON text, e.g.
+  //   { identifier: Some(Ident { type: Some("email") }), order: None } res="{\"ok\":true}"
+  // Struct/variant names are dropped, Some(x) / newtypes become x, None becomes
+  // null, tuples become arrays. A key=value pair becomes an object field; several
+  // top-level pieces are collected into one object.
+  var looseTruncated = false;
+  function looseToJson(src) {
+    looseTruncated = false;
+    var i = 0, n = src.length, bareTop = false;
+    var IDENT = /[A-Za-z_][\w$]*(?:::[A-Za-z_][\w$]*)*/y;
+    var PAIR = /[A-Za-z_][\w.\-]*=/y;
+    var INTKEY = /-?\d+/y;
+    var NUMBER = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
+    function fail(m) { throw new Error(m + " at character " + i); }
+    function ws() {
+      while (i < n) {
+        var c = src.charCodeAt(i);
+        if (c === 32 || c === 10 || c === 13 || c === 9) i++; else break;
+      }
+    }
+    function str() {
+      var r;
+      try { r = decodeRustString(src, i); }
+      catch (e) {
+        // A log line cut off before the closing quote: take the rest as the string.
+        if (!/^unterminated/.test(e.message)) throw e;
+        r = decodeRustString(src + '"', i);
+        looseTruncated = true;
+      }
+      i = r.end;
+      return JSON.stringify(r.s);
+    }
+    function token(top) {
+      var s = i;
+      while (i < n) {
+        var ch = src[i];
+        if (/\s/.test(ch) || (!top && ",)}]".indexOf(ch) !== -1)) break;
+        i++;
+      }
+      return src.slice(s, i);
+    }
+    function scalar(tok) {
+      if (NUMBER.test(tok) || tok === "true" || tok === "false") return tok;
+      if (tok === "None") return "null";
+      return JSON.stringify(tok);
+    }
+    function tuple(arr) {
+      return arr.length === 0 ? "null" : arr.length === 1 ? arr[0] : "[" + arr.join(",") + "]";
+    }
+    function items(close) {
+      var out = [];
+      ws();
+      while (src[i] !== close) {
+        if (i >= n) fail("expected '" + close + "'");
+        out.push(value(false));
+        ws();
+        if (src[i] === ",") { i++; ws(); }
+        else if (src[i] !== close) fail("expected ',' or '" + close + "'");
+      }
+      i++;
+      return out;
+    }
+    function keyTok() {
+      ws();
+      if (src[i] === '"') return str();
+      IDENT.lastIndex = i;
+      var m = IDENT.exec(src);
+      if (!m) { INTKEY.lastIndex = i; m = INTKEY.exec(src); }
+      if (!m) return null;
+      i += m[0].length;
+      return JSON.stringify(m[0]);
+    }
+    function braces() {
+      i++; ws();
+      if (src[i] === "}") { i++; return "{}"; }
+      var save = i, k = keyTok();
+      ws();
+      if (k !== null && src[i] === ":" && src[i + 1] !== ":") {
+        var ent = [];
+        for (;;) {
+          i++; // ':'
+          ent.push(k + ":" + value(false));
+          ws();
+          if (src[i] === ",") { i++; ws(); }
+          if (src[i] === "}") { i++; break; }
+          if (i >= n) fail("expected '}'");
+          k = keyTok(); ws();
+          if (k === null || src[i] !== ":") fail("expected a field name followed by ':'");
+        }
+        return "{" + ent.join(",") + "}";
+      }
+      i = save; // a set: {1, 2, 3}
+      return "[" + items("}").join(",") + "]";
+    }
+    function value(top) {
+      ws();
+      if (i >= n) fail("unexpected end of input");
+      var c = src[i];
+      if (c === '"') return str();
+      if (c === "'") {
+        var j = i + 1;
+        while (j < n && src[j] !== "'") j += src[j] === "\\" ? 2 : 1;
+        var raw = src.slice(i + 1, j); i = j + 1;
+        try { return JSON.stringify(decodeRustString('"' + raw + '"', 0).s); }
+        catch (e) { return JSON.stringify(raw); }
+      }
+      if (c === "{") return braces();
+      if (c === "[") { i++; return "[" + items("]").join(",") + "]"; }
+      if (c === "(") { i++; return tuple(items(")")); }
+      IDENT.lastIndex = i;
+      var m = IDENT.exec(src);
+      if (m) {
+        var after = i + m[0].length;
+        if (src[after] === "(") { i = after + 1; return tuple(items(")")); }
+        var j2 = src[after] === " " ? after + 1 : after;
+        if (src[j2] === "{") { i = j2; return braces(); }
+        if (src[j2] === "[") { i = j2 + 1; return "[" + items("]").join(",") + "]"; }
+      }
+      if (top) bareTop = true;
+      var tok = token(top);
+      if (!tok) fail("unexpected character '" + c + "'");
+      return scalar(tok);
+    }
+
+    var entries = [], used = {}, textParts = [], textEntry = null, structured = 0, unnamed = 0;
+    function uniqueKey(k) {
+      var base = k, c = 1;
+      while (used[k]) k = base + "_" + (++c);
+      used[k] = true;
+      return k;
+    }
+    ws();
+    while (i < n) {
+      PAIR.lastIndex = i;
+      var pm = PAIR.exec(src);
+      if (pm && src[i + pm[0].length] !== "=") {
+        i += pm[0].length;
+        entries.push([uniqueKey(pm[0].slice(0, -1)), value(true)]);
+        structured++;
+      } else {
+        var start = i;
+        bareTop = false;
+        var v = value(true);
+        if (bareTop) {
+          // Loose words (timestamps, log levels, ...) are gathered into one "text" field.
+          textParts.push(src.slice(start, i).trim());
+          if (!textEntry) { textEntry = [uniqueKey("text"), null]; entries.push(textEntry); }
+        } else {
+          unnamed++;
+          entries.push([uniqueKey(unnamed === 1 ? "value" : "value_" + unnamed), v]);
+          structured++;
+        }
+      }
+      ws();
+    }
+    if (!structured) fail("no struct, JSON or key=value data found");
+    if (textEntry) textEntry[1] = JSON.stringify(textParts.join(" "));
+    if (entries.length === 1 && entries[0][0] === "value") return entries[0][1];
+    return "{" + entries.map(function (e) { return JSON.stringify(e[0]) + ":" + e[1]; }).join(",") + "}";
+  }
+
+  // Text in which every quote is backslash-escaped (\" ... \") is the body of a
+  // JSON string literal; returns the unescaped text, or null when it isn't.
+  function unescapeQuoted(text) {
+    if (!/\\"/.test(text) || /(^|[^\\])"/.test(text)) return null;
+    try { return JSON.parse('"' + text.replace(/\r?\n/g, "\\n").replace(/\t/g, "\\t") + '"'); } catch (e) {}
+    return text.replace(/\\(["\\\/])/g, "$1").replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\r/g, "\r");
+  }
+
+  // Non-JSON input -> { text: JSON text, note } using the best matching format.
+  // Returns null when the input just looks like broken JSON (so the caller can
+  // report the precise JSON error); throws when it looks like Rust output but
+  // cannot be converted.
+  function convertToJson(text) {
+    // The inside of a JSON string pasted without its outer quotes: {\"a\":\"b\"}
+    var plain = unescapeQuoted(text);
+    if (plain !== null && plain !== text) {
+      try { JSON.parse(plain); return { text: plain, note: "unescaped JSON" }; } catch (e) {}
+      try {
+        var inner = convertToJson(plain);
+        if (inner) return { text: inner.text, note: "unescaped · " + inner.note };
+      } catch (e) {}
+    }
+    var fixed = quoteBareKeys(text);
+    if (fixed !== text) {
+      try { JSON.parse(fixed); return { text: fixed, note: "quoted bare keys" }; } catch (e) {}
+    }
+    var err1 = null;
+    try {
+      var d = tryDebug(text);
+      if (d !== null) return { text: d, note: "Rust debug converted" };
+    } catch (e) { err1 = e; }
+    try {
+      var lt = looseToJson(text);
+      return { text: lt, note: "Rust struct / log format converted" + (looseTruncated ? " (missing closing quote added)" : "") };
+    } catch (e2) {
+      var jsonish = /^\s*(?:\{\s*["}]|\[\s*["\]\[{\d\-]|\[\s*(?:true|false|null)\b)/.test(text);
+      if (jsonish && !err1) return null;
+      throw err1 || e2;
+    }
+  }
+  
+
+  // ---------------------------------------------------------------------------
+  // Parsing: plain JSON first, then Rust debug / log formats and JSON inside strings
+  // (same converters as the formatter).
+  // ---------------------------------------------------------------------------
+  function reviver(k, v) {
+    return typeof v === "string" && /^@@NUM[^@]+@@$/.test(v) ? { __num: v.slice(5, -2) } : v;
+  }
+  function parseNums(text) { return JSON.parse(protectNumbers(text), reviver); }
+
+  function toValue(raw, expand) {
+    var text = raw.trim(), jerr = null;
+    try { JSON.parse(text); } catch (e) { jerr = e; }
+    if (jerr) {
+      var conv = convertToJson(text);
+      if (!conv) throw jerr;
+      text = conv.text;
+    }
+    if (expand) {
+      var ctx = { texts: [], dbg: 0, json: 0 };
+      var walked = expandDebug(JSON.parse(protectNumbers(text)), ctx);
+      if (ctx.texts.length) text = splice(JSON.stringify(walked), ctx);
+    }
+    return parseNums(text);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Value helpers
+  // ---------------------------------------------------------------------------
+  var MISSING = { missing: true };
+
+  function typeOf(v) {
+    if (v === MISSING) return "missing";
+    if (v === null) return "null";
+    if (Array.isArray(v)) return "array";
+    if (typeof v === "object") return v.__num !== undefined ? "number" : "object";
+    return typeof v;
+  }
+  function numStr(v) { return typeof v === "object" ? v.__num : String(v); }
+  function ser(v, sorted) {
+    var t = typeOf(v);
+    if (t === "array") return "[" + v.map(function (x) { return ser(x, sorted); }).join(",") + "]";
+    if (t === "object") {
+      var ks = Object.keys(v); if (sorted) ks.sort();
+      return "{" + ks.map(function (k) { return JSON.stringify(k) + ":" + ser(v[k], sorted); }).join(",") + "}";
+    }
+    if (t === "number") return numStr(v);
+    return JSON.stringify(v);
+  }
+  function isContainer(t) { return t === "object" || t === "array"; }
+  function cmpKeys(a, b) {
+    var c = a.localeCompare(b, undefined, { sensitivity: "base" });
+    return c !== 0 ? c : (a < b ? -1 : a > b ? 1 : 0);
+  }
+  function leafEqual(a, b) {
+    var t = typeOf(a);
+    if (t !== typeOf(b)) return false;
+    if (t === "number") return typeof a === "number" && typeof b === "number" ? a === b : numStr(a) === numStr(b);
+    if (isContainer(t)) return ser(a, true) === ser(b, true);
+    return a === b;
+  }
+  function pathKey(path, k) {
+    return /^[\w$-]+$/.test(k) ? (path ? path + "." : "") + k : path + "[" + JSON.stringify(k) + "]";
+  }
+
+  // ---------------------------------------------------------------------------
+  // Diff. Every node: { label, path, a, b, status, children|null, counts }.
+  // status is changed | added | removed | same. Containers get children sorted A-Z.
+  // ---------------------------------------------------------------------------
+  var opt = { arr: "index", key: "id" };
+
+  function diff(a, b, label, path) {
+    var n = { label: label, path: path, a: a, b: b, status: "same", children: null, kind: null, open: false, note: "",
+              counts: { changed: 0, added: 0, removed: 0, same: 0 } };
+    var ta = typeOf(a), tb = typeOf(b);
+    if (a === MISSING) n.status = "added"; else if (b === MISSING) n.status = "removed";
+
+    var both = a !== MISSING && b !== MISSING;
+    var sameKind = both && ta === tb && isContainer(ta);
+    var oneSide = !both && isContainer(a === MISSING ? tb : ta);
+    if (sameKind || oneSide) {
+      n.kind = a === MISSING ? tb : ta;
+      n.children = n.kind === "object" ? diffObject(a, b, path) : diffArray(a, b, path, n);
+      if (n.children.length === 0) n.children = null;      // empty {} / [] behave as plain values
+    }
+    if (n.children) {
+      n.children.forEach(function (c) {
+        for (var s in c.counts) n.counts[s] += c.counts[s];
+      });
+      if (both) n.status = (n.counts.changed + n.counts.added + n.counts.removed) ? "changed" : "same";
+      n.open = (n.counts.changed + n.counts.added + n.counts.removed) > 0;
+    } else {
+      if (both) n.status = leafEqual(a, b) ? "same" : "changed";
+      n.counts[n.status]++;
+    }
+    return n;
+  }
+
+  function diffObject(a, b, path) {
+    var ks = {};
+    if (a !== MISSING) Object.keys(a).forEach(function (k) { ks[k] = 1; });
+    if (b !== MISSING) Object.keys(b).forEach(function (k) { ks[k] = 1; });
+    return Object.keys(ks).sort(cmpKeys).map(function (k) {
+      var va = a !== MISSING && Object.prototype.hasOwnProperty.call(a, k) ? a[k] : MISSING;
+      var vb = b !== MISSING && Object.prototype.hasOwnProperty.call(b, k) ? b[k] : MISSING;
+      return diff(va, vb, k, pathKey(path, k));
+    });
+  }
+
+  function keyedMap(arr) {
+    var m = new Map();
+    for (var i = 0; i < arr.length; i++) {
+      var it = arr[i];
+      if (typeOf(it) !== "object") return null;
+      var kv = it[opt.key], t = typeOf(kv);
+      if (kv === undefined || t === "object" || t === "array" || t === "null") return null;
+      var s = t === "number" ? numStr(kv) : String(kv);
+      if (m.has(s)) return null;
+      m.set(s, it);
+    }
+    return m;
+  }
+
+  function diffArray(a, b, path, node) {
+    var A = a === MISSING ? [] : a, B = b === MISSING ? [] : b, out = [], i;
+    if (opt.arr === "key" && (A.length || B.length)) {
+      var ma = keyedMap(A), mb = keyedMap(B);
+      if (ma && mb) {
+        var ks = {};
+        ma.forEach(function (v, k) { ks[k] = 1; });
+        mb.forEach(function (v, k) { ks[k] = 1; });
+        return Object.keys(ks).sort(cmpKeys).map(function (k) {
+          var lab = "[" + opt.key + "=" + k + "]";
+          return diff(ma.has(k) ? ma.get(k) : MISSING, mb.has(k) ? mb.get(k) : MISSING, lab, path + lab);
+        });
+      }
+      node.note = "no unique \"" + opt.key + "\" on every item, compared by position";
+    }
+    if (opt.arr === "unordered") {
+      var pool = new Map();
+      B.forEach(function (x, j) {
+        var c = ser(x, true);
+        if (!pool.has(c)) pool.set(c, []);
+        pool.get(c).push(j);
+      });
+      var used = {};
+      A.forEach(function (x, ia) {
+        var c = ser(x, true), list = pool.get(c);
+        if (list && list.length) {
+          var jb = list.shift(); used[jb] = 1;
+          out.push(diff(x, B[jb], "[" + ia + "]", path + "[" + ia + "]"));
+        } else out.push(diff(x, MISSING, "[" + ia + "]", path + "[" + ia + "]"));
+      });
+      B.forEach(function (x, j) { if (!used[j]) out.push(diff(MISSING, x, "[" + j + "]", path + "[" + j + "]")); });
+      return out;
+    }
+    var len = Math.max(A.length, B.length);
+    for (i = 0; i < len; i++) {
+      out.push(diff(i < A.length ? A[i] : MISSING, i < B.length ? B[i] : MISSING, "[" + i + "]", path + "[" + i + "]"));
+    }
+    return out;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Rendering
+  // ---------------------------------------------------------------------------
+  var state = { root: null, view: "tree", q: "", f: { changed: true, added: true, removed: true, same: false } };
+  var ROW_CAP = 4000, rows = 0, capped = false;
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+  function isLeaf(n) { return !n.children; }
+
+  function leafText(v) {
+    var t = typeOf(v);
+    if (t === "missing") return "";
+    if (t === "string") return JSON.stringify(v);
+    if (t === "number") return numStr(v);
+    if (isContainer(t)) { var s = ser(v); return s.length > 400 ? s.slice(0, 400) + "…" : s; }
+    return String(v);
+  }
+
+  // Marks which nodes are visible under the current filters / search.
+  function mark(n) {
+    var q = state.q;
+    if (isLeaf(n)) {
+      var ok = !!state.f[n.status];
+      if (ok && q) ok = n.path.toLowerCase().indexOf(q) >= 0 || leafText(n.a).toLowerCase().indexOf(q) >= 0 || leafText(n.b).toLowerCase().indexOf(q) >= 0;
+      n.v = ok;
+    } else {
+      var any = false;
+      n.children.forEach(function (c) { if (mark(c)) any = true; });
+      n.v = any;
+    }
+    return n.v;
+  }
+
+  function strFrag(sa, sb, side) {
+    var p = 0, max = Math.min(sa.length, sb.length);
+    while (p < max && sa.charCodeAt(p) === sb.charCodeAt(p)) p++;
+    var s = 0;
+    while (s < max - p && sa.charCodeAt(sa.length - 1 - s) === sb.charCodeAt(sb.length - 1 - s)) s++;
+    var me = side === "a" ? sa : sb;
+    var pre = me.slice(0, p), mid = me.slice(p, me.length - s), suf = me.slice(me.length - s);
+    if (pre.length > 48) pre = "…" + pre.slice(-40);
+    if (suf.length > 48) suf = suf.slice(0, 40) + "…";
+    var f = document.createDocumentFragment();
+    f.appendChild(document.createTextNode('"' + pre));
+    if (mid) { var m = el("mark", "hd", mid); f.appendChild(m); }
+    f.appendChild(document.createTextNode(suf + '"'));
+    return f;
+  }
+
+  function valueCell(n, side) {
+    var v = side === "a" ? n.a : n.b, o = side === "a" ? n.b : n.a;
+    var c = el("div", "v v" + side);
+    var t = typeOf(v);
+    if (t === "missing") { c.classList.add("empty"); c.textContent = "—"; return c; }
+    var span = el("span");
+    if (t === "string") {
+      span.className = "s-str";
+      if (typeOf(o) === "string" && o !== v) {
+        span.appendChild(strFrag(JSON.stringify(n.a).slice(1, -1), JSON.stringify(n.b).slice(1, -1), side));
+        span.title = JSON.stringify(v);
+      } else span.textContent = JSON.stringify(v);
+    } else if (t === "number") { span.className = "s-num"; span.textContent = numStr(v); }
+    else if (t === "boolean" || t === "null") { span.className = "s-lit"; span.textContent = String(v); }
+    else if (isContainer(t)) {
+      var s = ser(v);
+      span.textContent = s.length > 400 ? s.slice(0, 400) + "…" : s;
+      if (s.length > 400) span.title = s.slice(0, 2000);
+    } else span.textContent = String(v);
+    c.appendChild(span);
+    if (o !== MISSING && typeOf(o) !== t) c.appendChild(el("span", "ty", t));
+    return c;
+  }
+
+  function keyCell(n, depth, flat) {
+    var k = el("div", "k");
+    if (!flat) k.style.paddingLeft = (12 + depth * 16) + "px";
+    var l = el("div", "lbl");
+    l.appendChild(document.createTextNode(flat ? (n.path || "(root)") : (n.label || "(root)")));
+    k.title = n.path || "(root)";
+    k.appendChild(l);
+    return k;
+  }
+
+  function leafRow(n, depth, flat) {
+    var r = el("div", "row " + n.status);
+    r.appendChild(keyCell(n, depth, flat));
+    r.appendChild(valueCell(n, "a"));
+    r.appendChild(valueCell(n, "b"));
+    return r;
+  }
+
+  function pill(kind, count) {
+    return el("span", "pill " + kind, (kind === "changed" ? "~ " : kind === "added" ? "+ " : "− ") + count);
+  }
+
+  function groupRow(n, depth, body) {
+    var r = el("div", "row group" + (n.open ? " open" : ""));
+    r.setAttribute("role", "button");
+    r.setAttribute("tabindex", "0");
+    r.setAttribute("aria-expanded", n.open ? "true" : "false");
+    var k = el("div", "k");
+    k.style.paddingLeft = (12 + depth * 16) + "px";
+    k.appendChild(el("span", "caret"));
+    k.appendChild(el("span", "lbl", n.label));
+    k.title = n.path;
+    r.appendChild(k);
+    var gm = el("div", "gm");
+    var unit = n.kind === "object" ? ["key", "keys"] : ["item", "items"];
+    function cnt(v) { var c = n.kind === "object" ? Object.keys(v).length : v.length; return c; }
+    function word(c) { return c === 1 ? unit[0] : unit[1]; }
+    var size;
+    if (n.a !== MISSING && n.b !== MISSING && cnt(n.a) !== cnt(n.b)) size = cnt(n.a) + " → " + cnt(n.b) + " " + unit[1];
+    else { var c1 = cnt(n.b !== MISSING ? n.b : n.a); size = c1 + " " + word(c1); }
+    gm.appendChild(el("span", "size", (n.kind === "object" ? "{ } " : "[ ] ") + size));
+    if (n.status === "added") gm.appendChild(el("span", "pill added", "added"));
+    if (n.status === "removed") gm.appendChild(el("span", "pill removed", "removed"));
+    if (n.status === "changed") {
+      if (n.counts.changed) gm.appendChild(pill("changed", n.counts.changed));
+      if (n.counts.added) gm.appendChild(pill("added", n.counts.added));
+      if (n.counts.removed) gm.appendChild(pill("removed", n.counts.removed));
+    }
+    if (n.status === "same") gm.appendChild(el("span", "size", "unchanged"));
+    if (n.note) gm.appendChild(el("span", "size", n.note));
+    r.appendChild(gm);
+
+    function toggle() {
+      n.open = !n.open;
+      r.classList.toggle("open", n.open);
+      r.setAttribute("aria-expanded", n.open ? "true" : "false");
+      body.hidden = !n.open;
+      if (n.open && !body.firstChild) fill(n, depth + 1, body);
+    }
+    r.addEventListener("click", toggle);
+    r.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+    });
+    return r;
+  }
+
+  function fill(n, depth, parent) {
+    n.children.forEach(function (c) { renderNode(c, depth, parent); });
+  }
+
+  function renderNode(n, depth, parent) {
+    if (!n.v) return;
+    if (isLeaf(n)) {
+      if (rows >= ROW_CAP) { capped = true; return; }
+      rows++;
+      parent.appendChild(leafRow(n, depth, false));
+      return;
+    }
+    var body = el("div", "kids");
+    body.hidden = !n.open;
+    parent.appendChild(groupRow(n, depth, body));
+    parent.appendChild(body);
+    if (n.open) fill(n, depth + 1, body);
+  }
+
+  function collectLeaves(n, out) {
+    if (!n.v) return;
+    if (isLeaf(n)) out.push(n); else n.children.forEach(function (c) { collectLeaves(c, out); });
+  }
+
+  function head() {
+    var h = el("div", "thead");
+    h.appendChild(el("div", "", "Field"));
+    h.appendChild(el("div", "", "A · before"));
+    h.appendChild(el("div", "", "B · after"));
+    return h;
+  }
+
+  function render() {
+    var root = state.root;
+    var list = $("list");
+    list.textContent = "";
+    if (!root) return;
+    mark(root);
+    rows = 0; capped = false;
+
+    var c = root.counts;
+    var sum = $("summary");
+    sum.textContent = "";
+    [["changed", "Changed"], ["added", "Only in B"], ["removed", "Only in A"], ["same", "Unchanged"]].forEach(function (d) {
+      var b = el("button", "chip " + d[0]);
+      b.type = "button";
+      b.setAttribute("aria-pressed", state.f[d[0]] ? "true" : "false");
+      var n = el("b", "", String(c[d[0]]));
+      b.appendChild(n); b.appendChild(document.createTextNode(d[1]));
+      b.addEventListener("click", function () { state.f[d[0]] = !state.f[d[0]]; render(); });
+      sum.appendChild(b);
+    });
+    var total = c.changed + c.added + c.removed;
+    sum.appendChild(el("span", "hint", total ? total + " difference" + (total === 1 ? "" : "s") + " in " + (total + c.same) + " fields" : (total + c.same) + " fields compared"));
+
+    if (!total && !state.q) {
+      list.appendChild(el("div", "banner", "No differences. A and B are identical."));
+      if (!state.f.same) list.appendChild(el("div", "note", "Turn on “Unchanged” above to list every field."));
+    }
+    if (!root.v) {
+      if (total || state.q) list.appendChild(el("div", "banner muted", state.q ? "No fields match this filter." : "Nothing to show with the current filters."));
+      return;
+    }
+
+    list.appendChild(head());
+    var box = el("div", "tree");
+    list.appendChild(box);
+    if (state.view === "flat") {
+      var leaves = [];
+      collectLeaves(root, leaves);
+      leaves.forEach(function (n) {
+        if (rows >= ROW_CAP) { capped = true; return; }
+        rows++;
+        box.appendChild(leafRow(n, 0, true));
+      });
+    } else if (isLeaf(root)) {
+      rows++;
+      box.appendChild(leafRow(root, 0, false));
+    } else {
+      fill(root, 0, box);
+    }
+    if (capped) list.appendChild(el("div", "note", "Showing the first " + ROW_CAP + " rows. Use the filter or the chips above to narrow the list."));
+  }
+
+  function setAllOpen(n, open) {
+    if (!n.children) return;
+    n.open = open;
+    n.children.forEach(function (c) { setAllOpen(c, open); });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Compare / wiring
+  // ---------------------------------------------------------------------------
+  var inA = $("inA"), inB = $("inB"), results = $("results");
+
+  function fmtBytes(n) {
+    if (n < 1024) return n + " B";
+    if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+    return (n / 1048576).toFixed(2) + " MB";
+  }
+  function showErr(which, msg) {
+    var e = $("err" + which);
+    e.textContent = msg;
+    e.classList.toggle("show", !!msg);
+  }
+  function explain(e) {
+    var m = String(e && e.message || e).replace(/^JSON\.parse: /, "");
+    return "Invalid JSON: " + m;
+  }
+
+  function compare() {
+    showErr("A", ""); showErr("B", "");
+    var ta = inA.value.trim(), tb = inB.value.trim(), ok = true, va, vb;
+    opt.arr = $("arrMode").value;
+    opt.key = $("keyName").value.trim() || "id";
+    var expand = $("expand").checked;
+    if (!ta) { showErr("A", "Paste JSON for A."); ok = false; }
+    else { try { va = toValue(ta, expand); } catch (e) { showErr("A", explain(e)); ok = false; } }
+    if (!tb) { showErr("B", "Paste JSON for B."); ok = false; }
+    else { try { vb = toValue(tb, expand); } catch (e) { showErr("B", explain(e)); ok = false; } }
+    if (!ok) { results.hidden = true; state.root = null; return; }
+    state.root = diff(va, vb, "", "");
+    if (state.root.children && state.root.counts.changed + state.root.counts.added + state.root.counts.removed) state.root.open = true;
+    results.hidden = false;
+    render();
+    if (results.getBoundingClientRect().top > window.innerHeight * 0.7) results.scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
+  function report() {
+    var lines = [];
+    (function walk(n) {
+      if (!isLeaf(n)) { n.children.forEach(walk); return; }
+      if (n.status === "same") return;
+      var p = n.path || "(root)";
+      if (n.status === "changed") lines.push("CHANGED  " + p + ": " + leafText(n.a) + " → " + leafText(n.b));
+      else if (n.status === "added") lines.push("ADDED    " + p + ": " + leafText(n.b));
+      else lines.push("REMOVED  " + p + ": " + leafText(n.a));
+    })(state.root);
+    return lines.join("\n") || "No differences.";
+  }
+
+  function legacyCopy(text) {
+    return new Promise(function (resolve, reject) {
+      var t = document.createElement("textarea");
+      t.value = text; t.setAttribute("readonly", "");
+      t.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+      document.body.appendChild(t); t.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) {}
+      document.body.removeChild(t);
+      ok ? resolve() : reject(new Error("copy failed"));
+    });
+  }
+  function copy(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text).catch(function () { return legacyCopy(text); });
+    }
+    return legacyCopy(text);
+  }
+
+  var EX_A = { code: "20260AD796", status: "open", tip: 0, totalIncl: 100, clientName: "IOS TEST IPAD", isClosed: false,
+    items: { "06257F": { title: "Adai Avial", quantity: 4, priceIncl: 20, modifiers: [], categories: [{ id: "c1", title: "Dosa" }] },
+             "140569": { title: "APicbase item", quantity: 2, priceIncl: 10, vat: 9 } },
+    payments: [{ id: "p1", method: "cash", total: 100 }], tags: ["a", "b", "c"], updatedOn: 1791369052.745071 };
+  var EX_B = { code: "20260AD796", status: "paid", tip: 5, totalIncl: 100, clientName: "IOS TEST IPAD", isClosed: true, loyalty: { points: 12 },
+    items: { "06257F": { title: "Adai Avial KDS", quantity: 3, priceIncl: 20, modifiers: [{ title: "Extra" }], categories: [{ id: "c1", title: "Dosa" }] },
+             "9ZZZZ": { title: "Fries", quantity: 1, priceIncl: 12 } },
+    payments: [{ id: "p1", method: "card", total: 100 }, { id: "p2", method: "cash", total: 5 }], tags: ["c", "a"], updatedOn: 1791369053.207179 };
+
+  function meta(ta, id) { $(id).textContent = ta.value ? fmtBytes(new Blob([ta.value]).size) : ""; }
+  inA.addEventListener("input", function () { meta(inA, "metaA"); });
+  inB.addEventListener("input", function () { meta(inB, "metaB"); });
+
+  $("compare").addEventListener("click", compare);
+  $("example").addEventListener("click", function () {
+    inA.value = JSON.stringify(EX_A, null, 2); inB.value = JSON.stringify(EX_B, null, 2);
+    meta(inA, "metaA"); meta(inB, "metaB"); compare();
+  });
+  $("swap").addEventListener("click", function () {
+    var t = inA.value; inA.value = inB.value; inB.value = t;
+    meta(inA, "metaA"); meta(inB, "metaB");
+    if (!results.hidden) compare();
+  });
+  $("clear").addEventListener("click", function () {
+    inA.value = ""; inB.value = ""; meta(inA, "metaA"); meta(inB, "metaB");
+    showErr("A", ""); showErr("B", ""); results.hidden = true; state.root = null; inA.focus();
+  });
+  ["arrMode", "keyName", "expand"].forEach(function (id) {
+    $(id).addEventListener("change", function () {
+      $("keyWrap").hidden = $("arrMode").value !== "key";
+      if (!results.hidden) compare();
+    });
+  });
+  $("keyName").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); compare(); } });
+  $("arrMode").addEventListener("change", function () { $("keyWrap").hidden = $("arrMode").value !== "key"; });
+
+  function setView(v) {
+    state.view = v;
+    $("vTree").setAttribute("aria-pressed", v === "tree" ? "true" : "false");
+    $("vFlat").setAttribute("aria-pressed", v === "flat" ? "true" : "false");
+    $("expandAll").disabled = $("collapseAll").disabled = v === "flat";
+    render();
+  }
+  $("vTree").addEventListener("click", function () { setView("tree"); });
+  $("vFlat").addEventListener("click", function () { setView("flat"); });
+  $("expandAll").addEventListener("click", function () { if (state.root) { setAllOpen(state.root, true); render(); } });
+  $("collapseAll").addEventListener("click", function () { if (state.root) { setAllOpen(state.root, false); state.root.open = true; render(); } });
+  var searchTimer = null;
+  $("search").addEventListener("input", function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () {
+      state.q = $("search").value.trim().toLowerCase();
+      if (state.q && state.root) setAllOpen(state.root, true);
+      render();
+    }, 120);
+  });
+  var copyTimer = null;
+  $("copy").addEventListener("click", function () {
+    if (!state.root) return;
+    var b = $("copy");
+    copy(report()).then(function () { b.textContent = "Copied"; }).catch(function () { b.textContent = "Copy failed"; }).then(function () {
+      clearTimeout(copyTimer);
+      copyTimer = setTimeout(function () { b.textContent = "Copy report"; }, 1600);
+    });
+  });
+  document.addEventListener("keydown", function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); compare(); }
+  });
+})();
+</script>
+</body>
+</html>

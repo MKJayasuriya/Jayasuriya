@@ -1,0 +1,1521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JSON Formatter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Archivo:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="tools.css">
+<style>
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .app {
+    min-height: calc(100dvh - 58px);
+    height: calc(100dvh - 58px);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+    max-width: 1500px;
+    margin: 0 auto;
+    box-sizing: border-box;
+  }
+  .bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+  }
+  h1 {
+    font-family: 'Newsreader', serif;
+    font-size: 22px;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    margin: 0 auto 0 0;
+    color: var(--ink);
+  }
+  .controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  button, select {
+    font: inherit;
+    font-size: 13px;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--ink);
+    border-radius: 999px;
+    padding: 6px 14px;
+    cursor: pointer;
+    min-height: 32px;
+    line-height: 1.2;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  select {
+    background: var(--panel);
+  }
+  button:hover:not(:disabled) {
+    background: var(--ink);
+    color: var(--bg);
+  }
+  select:hover {
+    border-color: var(--accent);
+  }
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  button:disabled:hover {
+    background: transparent;
+    color: var(--ink);
+  }
+  button:focus-visible, select:focus-visible, textarea:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  button:active:not(:disabled) {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+  button.primary {
+    background: var(--ink);
+    border: 1px solid var(--ink);
+    color: var(--bg);
+    font-weight: 500;
+  }
+  button.primary:hover:not(:disabled) {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+  button.primary:active:not(:disabled) {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+  button.primary:disabled:hover {
+    background: var(--ink);
+    color: var(--bg);
+  }
+  .hint {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .hint.kbd {
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .panes {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 800px) {
+    .panes { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+    .hint.kbd { display: none; }
+  }
+  .pane {
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 46px;
+    padding: 6px 8px 6px 14px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--line);
+    font-weight: 500;
+    font-size: 14px;
+  }
+  .pane-head > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pane-head .meta {
+    font-family: var(--mono);
+    color: var(--muted);
+    font-weight: 400;
+    font-size: 12px;
+    margin-left: 8px;
+  }
+  .pane-head .meta.ok { color: var(--ok); }
+  .pane-head .meta.bad { color: var(--err); }
+  .pane-head button { padding: 5px 12px; min-height: 32px; white-space: nowrap; }
+  #copy.done {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+  }
+
+  /* ---------- editor ---------- */
+  .edhost {
+    --fs: 13px;
+    --lh: 21px;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  @media (max-width: 800px) {
+    .edhost { --fs: 16px; --lh: 24px; }
+  }
+  .edwrap { flex: 1; min-height: 0; position: relative; display: flex; }
+  .scroller { flex: 1; min-width: 0; overflow: auto; position: relative; }
+  .stack {
+    position: relative;
+    min-height: 100%;
+    min-width: 100%;
+    width: max-content;
+    font: 400 var(--fs)/var(--lh) var(--mono);
+    background-image: linear-gradient(to right,
+      var(--panel-2) calc(var(--gutter, 44px) - 1px),
+      var(--line) calc(var(--gutter, 44px) - 1px),
+      var(--line) var(--gutter, 44px),
+      transparent var(--gutter, 44px));
+  }
+  .hl, .ml, .edhost textarea {
+    margin: 0;
+    border: 0;
+    font: inherit;
+    letter-spacing: 0;
+    font-variant-ligatures: none;
+    tab-size: 2;
+    white-space: pre;
+  }
+  .hl, .ml { padding: 12px 14px 12px calc(var(--gutter, 44px) + 12px); }
+  .ml { position: absolute; inset: 0; color: transparent; z-index: 0; pointer-events: none; }
+  .hl { position: relative; z-index: 1; pointer-events: none; color: var(--ink); }
+  .edhost textarea {
+    position: absolute;
+    inset: 0 0 0 var(--gutter, 44px);
+    padding: 12px 14px 12px 12px;
+    z-index: 2;
+    resize: none;
+    overflow: hidden;
+    outline: none;
+    background: transparent;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    caret-color: var(--ink);
+  }
+  .edhost textarea::placeholder { color: var(--muted); -webkit-text-fill-color: var(--muted); }
+  .edhost textarea::selection { background: var(--sel); }
+  .edhost.wrap .hl, .edhost.wrap .ml, .edhost.wrap textarea { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .edhost.wrap .stack { width: 100%; }
+  .edhost.plain { --gutter: 0px; }
+  .ln { position: relative; min-height: var(--lh); }
+  .hl .ln::before {
+    content: attr(data-n);
+    position: absolute;
+    left: calc(-1 * (var(--gutter, 44px) + 12px));
+    width: calc(var(--gutter, 44px) - 24px);
+    text-align: right;
+    color: var(--muted);
+    opacity: 0.6;
+    user-select: none;
+  }
+  .fold {
+    position: absolute;
+    left: -34px;
+    top: 0;
+    width: 20px;
+    height: var(--lh);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    cursor: pointer;
+    pointer-events: auto;
+    opacity: 0;
+    user-select: none;
+  }
+  .fold::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-right: 1.6px solid currentColor;
+    border-bottom: 1.6px solid currentColor;
+    transform: translateY(-2px) rotate(45deg);
+  }
+  .fold.closed::before { transform: translateX(-2px) rotate(-45deg); }
+  .edhost:hover .fold, .fold.closed { opacity: 1; }
+  .fold:hover { color: var(--ink); }
+  .fold-ph {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-radius: 3px;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+  .edhost.folded .hl { pointer-events: auto; user-select: text; cursor: text; }
+  .edhost.folded textarea { visibility: hidden; }
+  .foldbar {
+    display: none;
+    position: absolute;
+    top: 8px;
+    right: 22px;
+    z-index: 3;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 4px 3px 12px;
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  }
+  .edhost.folded .foldbar { display: flex; }
+  .foldbar button { min-height: 26px; padding: 2px 10px; font-size: 12px; border-radius: 999px; }
+  .ml mark { background: var(--mk); color: transparent; border-radius: 2px; }
+  .ml mark.cur { background: var(--mk-cur); }
+
+  /* find / replace bar */
+  .find {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 10px;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--line);
+  }
+  .find.open { display: flex; }
+  .find .row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .find .rep-row { display: none; }
+  .find.rep .rep-row { display: flex; }
+  .find input {
+    flex: 1 1 140px;
+    min-width: 0;
+    min-height: 32px;
+    padding: 4px 9px;
+    font: 13px var(--mono);
+    color: var(--ink);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+  }
+  .find input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .find button { min-height: 32px; padding: 3px 10px; font-size: 13px; }
+  .find .cnt { font-size: 12px; color: var(--muted); min-width: 58px; text-align: center; white-space: nowrap; font-family: var(--mono); }
+  .find .cnt.none { color: var(--err); }
+  @media (max-width: 800px) { .find input { font-size: 16px; } }
+
+  .actions { display: flex; align-items: center; gap: 6px; }
+  button.toggle[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+    font-weight: 500;
+  }
+
+  .tk { color: var(--t-key); }
+  .ts { color: var(--t-str); }
+  .tn { color: var(--t-num); }
+  .tl { color: var(--t-lit); }
+  .tp { color: var(--t-punc); }
+
+  .error {
+    display: none;
+    margin: 0;
+    padding: 10px 14px;
+    background: var(--err-bg);
+    color: var(--err);
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+  }
+  .error.show { display: block; }
+  .error code { font-family: var(--mono); font-size: 12px; }
+</style>
+<script src="theme.js"></script>
+</head>
+<body>
+<header class="site-header">
+  <div class="site-header-inner">
+    <a href="index.html" class="site-brand">Jayasuriya <em>MK</em></a>
+    <nav class="site-nav">
+      <a href="index.html" class="site-nav-link">Home</a>
+      <a href="index.html#work" class="site-nav-link">Work</a>
+      <a href="JSON_Formatter.html" class="site-nav-link" aria-current="page">Formatter</a>
+      <a href="JSON_Diff.html" class="site-nav-link">Diff</a>
+      <button type="button" class="site-theme-toggle" data-theme-toggle>
+        <span class="site-toggle-track"><span class="site-toggle-knob"></span></span>
+        <span class="site-toggle-label">Light</span>
+      </button>
+    </nav>
+  </div>
+</header>
+
+<div class="app">
+  <div class="bar">
+    <h1>JSON formatter</h1>
+    <div class="controls">
+      <span class="hint kbd">Ctrl/⌘+Enter format · Ctrl/⌘+F find · Ctrl/⌘+H replace</span>
+      <select id="indent" aria-label="Indentation">
+        <option value="2">2 spaces</option>
+        <option value="4">4 spaces</option>
+        <option value="tab">Tab</option>
+      </select>
+      <button id="wrap" type="button" class="toggle" aria-pressed="false" title="Wrap long lines so nothing scrolls sideways">Word wrap</button>
+      <button id="minify" type="button">Minify</button>
+      <button id="clear" type="button">Clear</button>
+      <button id="format" type="button" class="primary">Format</button>
+    </div>
+  </div>
+
+  <div class="panes">
+    <section class="pane" aria-label="Input">
+      <div class="pane-head">
+        <span>Input<span class="meta" id="inMeta"></span></span>
+        <span class="actions">
+          <button id="inFold" type="button" title="Fold / unfold all blocks" disabled>Fold all</button>
+          <button id="inFind" type="button" title="Find / replace (Ctrl/⌘+F)">Find</button>
+        </span>
+      </div>
+      <div class="edhost" id="inHost"></div>
+      <p class="error" id="error" role="alert"></p>
+    </section>
+
+    <section class="pane" aria-label="Output">
+      <div class="pane-head">
+        <span>Formatted<span class="meta" id="outMeta"></span></span>
+        <span class="actions">
+          <button id="outFold" type="button" title="Fold / unfold all blocks" disabled>Fold all</button>
+          <button id="outFind" type="button" title="Find / replace (Ctrl/⌘+F)">Find</button>
+          <button id="copy" type="button" disabled>Copy</button>
+        </span>
+      </div>
+      <div class="edhost" id="outHost"></div>
+    </section>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <span>© 2026 Jayasuriya MK</span>
+  <span class="site-footer-links">
+    <a href="https://github.com/MKJSM" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://www.linkedin.com/in/jayasuriya-mk" target="_blank" rel="noopener">LinkedIn</a>
+    <span>Rust backend developer</span>
+  </span>
+</footer>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var errorBox = $("error");
+  var copyBtn = $("copy"), inMeta = $("inMeta"), outMeta = $("outMeta");
+  var indentSel = $("indent");
+  var copyTimer = null;
+  var currentMode = "format";            // "format" | "minify"
+  var inputDirty = false;                // input edited since the last Format
+  var minifyBtn = $("minify");
+  var wrapBtn = $("wrap");
+  var inEd, outEd;                       // created at the bottom
+
+  // The Minify button turns into "Expand" while the output is minified.
+  function setMode(m) {
+    currentMode = m;
+    minifyBtn.textContent = m === "minify" ? "Expand" : "Minify";
+  }
+
+  function setWrap(on) {
+    inEd.setWrap(on); outEd.setWrap(on);
+    wrapBtn.setAttribute("aria-pressed", on ? "true" : "false");
+    try { localStorage.setItem("jsonFormatterWrap", on ? "1" : "0"); } catch (e) {}
+  }
+
+  function fmtBytes(n) {
+    if (n < 1024) return n + " B";
+    if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+    return (n / 1048576).toFixed(2) + " MB";
+  }
+
+  // Re-serialises the original text token by token, so number literals and
+  // key order stay exactly as written. JSON.parse + stringify would round
+  // large integers and reorder integer-like keys.
+  function rewrite(text, unit) {
+    var out = [], level = 0, i = 0, n = text.length;
+    var pretty = unit !== null;
+    function pad(l) { return pretty ? "\n" + unit.repeat(l) : ""; }
+    function isWs(c) { return c === " " || c === "\n" || c === "\r" || c === "\t"; }
+    while (i < n) {
+      var c = text[i];
+      if (isWs(c)) { i++; continue; }
+      if (c === '"') {
+        var j = i + 1;
+        while (j < n && text[j] !== '"') { j += text[j] === "\\" ? 2 : 1; }
+        out.push(text.slice(i, j + 1));
+        i = j + 1;
+      } else if (c === "{" || c === "[") {
+        var k = i + 1;
+        while (k < n && isWs(text[k])) k++;
+        var close = c === "{" ? "}" : "]";
+        if (text[k] === close) { out.push(c + close); i = k + 1; }
+        else { level++; out.push(c + pad(level)); i++; }
+      } else if (c === "}" || c === "]") {
+        level--; out.push(pad(level) + c); i++;
+      } else if (c === ",") {
+        out.push("," + pad(level)); i++;
+      } else if (c === ":") {
+        out.push(pretty ? ": " : ":"); i++;
+      } else {
+        var m = i;
+        while (m < n && !isWs(text[m]) && ",:]}".indexOf(text[m]) === -1) m++;
+        out.push(text.slice(i, m));
+        i = m;
+      }
+    }
+    return out.join("");
+  }
+
+  function esc(s) {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  var TOKEN = /("(?:\\.|[^"\\])*")(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|[{}\[\],:]/g;
+  function highlight(text) {
+    return esc(text).replace(TOKEN, function (m, str, colon, lit) {
+      if (str) return colon
+        ? '<span class="tk">' + str + '</span><span class="tp">' + colon + "</span>"
+        : '<span class="ts">' + str + "</span>";
+      if (lit) return '<span class="tl">' + m + "</span>";
+      if (/^[{}\[\],:]$/.test(m)) return '<span class="tp">' + m + "</span>";
+      return '<span class="tn">' + m + "</span>";
+    });
+  }
+
+  // ---- rust debug start
+  // Decodes a Rust string literal ("..." with Rust escapes) starting at src[i].
+  // Returns { s: decoded string, end: index after the closing quote }.
+  function decodeRustString(src, i) {
+    var n = src.length, out = "", start = i;
+    i++;
+    while (i < n && src[i] !== '"') {
+      var c = src[i];
+      if (c === "\\") {
+        var d = src[i + 1]; i += 2;
+        if (d === "n") out += "\n";
+        else if (d === "r") out += "\r";
+        else if (d === "t") out += "\t";
+        else if (d === "0") out += "\0";
+        else if (d === "\\" || d === '"' || d === "'") out += d;
+        else if (d === "u") {
+          var m = /^\{([0-9a-fA-F]{1,6})\}/.exec(src.slice(i, i + 9));
+          if (!m) throw new Error("bad \\u escape at character " + i);
+          out += String.fromCodePoint(parseInt(m[1], 16));
+          i += m[0].length;
+        } else if (d === "x") {
+          out += String.fromCharCode(parseInt(src.slice(i, i + 2), 16));
+          i += 2;
+        } else throw new Error("bad escape \\" + d + " at character " + (i - 2));
+      } else { out += c; i++; }
+    }
+    if (i >= n) throw new Error("unterminated string starting at character " + start);
+    return { s: out, end: i + 1 };
+  }
+
+  // Converts the `{:?}` / `{:#?}` output of a serde_json::Value, e.g.
+  //   Some(Object {"a": String("x"), "n": Number(1.5), "l": Array [Null, Bool(true)]})
+  // into JSON text. Number literals are copied verbatim (no precision loss).
+  function debugToJson(src) {
+    var i = 0, n = src.length;
+    function fail(m) { throw new Error(m + " at character " + i); }
+    function ws() {
+      while (i < n) {
+        var c = src.charCodeAt(i);
+        if (c === 32 || c === 10 || c === 13 || c === 9) i++; else break;
+      }
+    }
+    function peek(s) { ws(); return src.slice(i, i + s.length) === s; }
+    function eat(s) { if (!peek(s)) fail("expected '" + s + "'"); i += s.length; }
+    function rustString() {
+      ws();
+      if (src[i] !== '"') fail("expected a string");
+      var r = decodeRustString(src, i);
+      i = r.end;
+      return JSON.stringify(r.s);
+    }
+    function value() {
+      ws();
+      if (peek("Some(")) { eat("Some("); var sv = value(); eat(")"); return sv; }
+      if (peek("None")) { eat("None"); return "null"; }
+      if (peek("Null")) { eat("Null"); return "null"; }
+      if (peek("Bool(")) {
+        eat("Bool(");
+        var b;
+        if (peek("true")) { eat("true"); b = "true"; } else { eat("false"); b = "false"; }
+        eat(")");
+        return b;
+      }
+      if (peek("Number(")) {
+        eat("Number("); ws();
+        var j = i;
+        while (j < n && src[j] !== ")") j++;
+        var num = src.slice(i, j).trim();
+        if (!/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(num)) fail("bad number '" + num + "'");
+        i = j; eat(")");
+        return num;
+      }
+      if (peek("String(")) { eat("String("); var s = rustString(); eat(")"); return s; }
+      if (peek("Array")) {
+        eat("Array"); eat("[");
+        var items = [];
+        while (!peek("]")) {
+          items.push(value());
+          if (peek(",")) eat(","); else break;
+        }
+        eat("]");
+        return "[" + items.join(",") + "]";
+      }
+      if (peek("Object")) {
+        eat("Object"); eat("{");
+        var ent = [];
+        while (!peek("}")) {
+          var k = rustString(); eat(":");
+          ent.push(k + ":" + value());
+          if (peek(",")) eat(","); else break;
+        }
+        eat("}");
+        return "{" + ent.join(",") + "}";
+      }
+      fail("unexpected token");
+    }
+    var res = value(); ws();
+    if (i < n) fail("unexpected trailing text");
+    return res;
+  }
+
+  // Also matches the JSON-escaped form: Some(Object {\"a\": String(\"x\")})
+  var DEBUG_START = /^\s*(?:Some\(\s*)?(?:Object\s*\{|Array\s*\[|String\(\s*\\?"|Number\(|Bool\(|Null\b)/;
+  function looksLikeDebug(s) { return DEBUG_START.test(s); }
+
+  // Raw pasted debug text. Returns null when the text isn't debug output,
+  // throws when it looks like debug output but can't be converted.
+  function tryDebug(text) {
+    if (!looksLikeDebug(text)) return null;
+    try { return debugToJson(text); }
+    catch (e1) {
+      if (text.indexOf('\\"') !== -1) {
+        var unescaped = null;
+        try { unescaped = JSON.parse('"' + text + '"'); } catch (e) {}
+        if (unescaped !== null) { try { return debugToJson(unescaped); } catch (e) {} }
+      }
+      throw e1;
+    }
+  }
+
+  // Walks parsed JSON and swaps string fields that hold either
+  //   - a JSON object/array encoded as a string ("{\"a\": 1}"), or
+  //   - Rust debug output,
+  // for a placeholder; the converted text is spliced back in by splice().
+  // Nested cases (JSON string inside a JSON string, debug inside either) are
+  // expanded recursively. ctx = { texts: [], dbg: 0, json: 0 }.
+  function expandDebug(v, ctx) {
+    if (typeof v === "string") {
+      var t = v.trim(), c = t.charAt(0), e = t.charAt(t.length - 1);
+      if ((c === "{" && e === "}") || (c === "[" && e === "]")) {
+        var inner;
+        try { inner = JSON.parse(protectNumbers(t)); } catch (err) { inner = undefined; }
+        if (inner !== undefined) {
+          var dbgBefore = ctx.dbg, jsonBefore = ctx.json;
+          var sub = expandDebug(inner, ctx);
+          ctx.json++;
+          // Keep the original text (exact numbers) unless something inside changed.
+          var changed = ctx.dbg !== dbgBefore || ctx.json !== jsonBefore + 1;
+          ctx.texts.push(changed ? JSON.stringify(sub) : t);
+          return "@@DBG" + (ctx.texts.length - 1) + "@@";
+        }
+      }
+      if (looksLikeDebug(v)) {
+        try { ctx.texts.push(debugToJson(v)); ctx.dbg++; return "@@DBG" + (ctx.texts.length - 1) + "@@"; } catch (err) {}
+      }
+      return v;
+    }
+    if (Array.isArray(v)) return v.map(function (x) { return expandDebug(x, ctx); });
+    if (v && typeof v === "object") {
+      var o = {};
+      Object.keys(v).forEach(function (k) { o[k] = expandDebug(v[k], ctx); });
+      return o;
+    }
+    return v;
+  }
+
+  // JSON.parse rounds numbers beyond double precision (e.g. 64-bit IDs).
+  // Wrap such literals in a placeholder string so they survive a parse/stringify.
+  function protectNumbers(t) {
+    var out = "", i = 0, n = t.length, num = /-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
+    while (i < n) {
+      var c = t[i];
+      if (c === '"') {
+        var j = i + 1;
+        while (j < n && t[j] !== '"') j += t[j] === "\\" ? 2 : 1;
+        out += t.slice(i, j + 1); i = j + 1;
+      } else if (c === "-" || (c >= "0" && c <= "9")) {
+        num.lastIndex = i;
+        var m = num.exec(t);
+        if (!m) { out += c; i++; continue; }
+        var lit = m[0];
+        out += lit.replace(/\D/g, "").length >= 16 ? '"@@NUM' + lit + '@@"' : lit;
+        i += lit.length;
+      } else { out += c; i++; }
+    }
+    return out;
+  }
+
+  // Replaces placeholders with their converted text, repeating for nesting.
+  function splice(text, ctx) {
+    var prev;
+    do {
+      prev = text;
+      text = text.replace(/"@@DBG(\d+)@@"/g, function (m, d) { return ctx.texts[+d]; });
+    } while (text !== prev);
+    return text.replace(/"@@NUM([^@]+)@@"/g, "$1");
+  }
+
+  // Lenient fallback: {json: 1} -> {"json": 1}. Strings are copied verbatim.
+  function quoteBareKeys(t) {
+    var out = "", i = 0, n = t.length, word = /[A-Za-z_$][\w$-]*/y;
+    while (i < n) {
+      var c = t[i];
+      if (c === '"') {
+        var j = i + 1;
+        while (j < n && t[j] !== '"') j += t[j] === "\\" ? 2 : 1;
+        out += t.slice(i, j + 1); i = j + 1;
+      } else if (/[A-Za-z_$]/.test(c)) {
+        word.lastIndex = i;
+        var w = word.exec(t)[0], k = i + w.length;
+        while (k < n && /\s/.test(t[k])) k++;
+        out += t[k] === ":" ? '"' + w + '"' : w;
+        i += w.length;
+      } else { out += c; i++; }
+    }
+    return out;
+  }
+  // Converts Rust *derived* Debug output and logfmt-style `key=value` pairs to
+  // JSON text, e.g.
+  //   { identifier: Some(Ident { type: Some("email") }), order: None } res="{\"ok\":true}"
+  // Struct/variant names are dropped, Some(x) / newtypes become x, None becomes
+  // null, tuples become arrays. A key=value pair becomes an object field; several
+  // top-level pieces are collected into one object.
+  var looseTruncated = false;
+  function looseToJson(src) {
+    looseTruncated = false;
+    var i = 0, n = src.length, bareTop = false;
+    var IDENT = /[A-Za-z_][\w$]*(?:::[A-Za-z_][\w$]*)*/y;
+    var PAIR = /[A-Za-z_][\w.\-]*=/y;
+    var INTKEY = /-?\d+/y;
+    var NUMBER = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
+    function fail(m) { throw new Error(m + " at character " + i); }
+    function ws() {
+      while (i < n) {
+        var c = src.charCodeAt(i);
+        if (c === 32 || c === 10 || c === 13 || c === 9) i++; else break;
+      }
+    }
+    function str() {
+      var r;
+      try { r = decodeRustString(src, i); }
+      catch (e) {
+        // A log line cut off before the closing quote: take the rest as the string.
+        if (!/^unterminated/.test(e.message)) throw e;
+        r = decodeRustString(src + '"', i);
+        looseTruncated = true;
+      }
+      i = r.end;
+      return JSON.stringify(r.s);
+    }
+    function token(top) {
+      var s = i;
+      while (i < n) {
+        var ch = src[i];
+        if (/\s/.test(ch) || (!top && ",)}]".indexOf(ch) !== -1)) break;
+        i++;
+      }
+      return src.slice(s, i);
+    }
+    function scalar(tok) {
+      if (NUMBER.test(tok) || tok === "true" || tok === "false") return tok;
+      if (tok === "None") return "null";
+      return JSON.stringify(tok);
+    }
+    function tuple(arr) {
+      return arr.length === 0 ? "null" : arr.length === 1 ? arr[0] : "[" + arr.join(",") + "]";
+    }
+    function items(close) {
+      var out = [];
+      ws();
+      while (src[i] !== close) {
+        if (i >= n) fail("expected '" + close + "'");
+        out.push(value(false));
+        ws();
+        if (src[i] === ",") { i++; ws(); }
+        else if (src[i] !== close) fail("expected ',' or '" + close + "'");
+      }
+      i++;
+      return out;
+    }
+    function keyTok() {
+      ws();
+      if (src[i] === '"') return str();
+      IDENT.lastIndex = i;
+      var m = IDENT.exec(src);
+      if (!m) { INTKEY.lastIndex = i; m = INTKEY.exec(src); }
+      if (!m) return null;
+      i += m[0].length;
+      return JSON.stringify(m[0]);
+    }
+    function braces() {
+      i++; ws();
+      if (src[i] === "}") { i++; return "{}"; }
+      var save = i, k = keyTok();
+      ws();
+      if (k !== null && src[i] === ":" && src[i + 1] !== ":") {
+        var ent = [];
+        for (;;) {
+          i++; // ':'
+          ent.push(k + ":" + value(false));
+          ws();
+          if (src[i] === ",") { i++; ws(); }
+          if (src[i] === "}") { i++; break; }
+          if (i >= n) fail("expected '}'");
+          k = keyTok(); ws();
+          if (k === null || src[i] !== ":") fail("expected a field name followed by ':'");
+        }
+        return "{" + ent.join(",") + "}";
+      }
+      i = save; // a set: {1, 2, 3}
+      return "[" + items("}").join(",") + "]";
+    }
+    function value(top) {
+      ws();
+      if (i >= n) fail("unexpected end of input");
+      var c = src[i];
+      if (c === '"') return str();
+      if (c === "'") {
+        var j = i + 1;
+        while (j < n && src[j] !== "'") j += src[j] === "\\" ? 2 : 1;
+        var raw = src.slice(i + 1, j); i = j + 1;
+        try { return JSON.stringify(decodeRustString('"' + raw + '"', 0).s); }
+        catch (e) { return JSON.stringify(raw); }
+      }
+      if (c === "{") return braces();
+      if (c === "[") { i++; return "[" + items("]").join(",") + "]"; }
+      if (c === "(") { i++; return tuple(items(")")); }
+      IDENT.lastIndex = i;
+      var m = IDENT.exec(src);
+      if (m) {
+        var after = i + m[0].length;
+        if (src[after] === "(") { i = after + 1; return tuple(items(")")); }
+        var j2 = src[after] === " " ? after + 1 : after;
+        if (src[j2] === "{") { i = j2; return braces(); }
+        if (src[j2] === "[") { i = j2 + 1; return "[" + items("]").join(",") + "]"; }
+      }
+      if (top) bareTop = true;
+      var tok = token(top);
+      if (!tok) fail("unexpected character '" + c + "'");
+      return scalar(tok);
+    }
+
+    var entries = [], used = {}, textParts = [], textEntry = null, structured = 0, unnamed = 0;
+    function uniqueKey(k) {
+      var base = k, c = 1;
+      while (used[k]) k = base + "_" + (++c);
+      used[k] = true;
+      return k;
+    }
+    ws();
+    while (i < n) {
+      PAIR.lastIndex = i;
+      var pm = PAIR.exec(src);
+      if (pm && src[i + pm[0].length] !== "=") {
+        i += pm[0].length;
+        entries.push([uniqueKey(pm[0].slice(0, -1)), value(true)]);
+        structured++;
+      } else {
+        var start = i;
+        bareTop = false;
+        var v = value(true);
+        if (bareTop) {
+          // Loose words (timestamps, log levels, ...) are gathered into one "text" field.
+          textParts.push(src.slice(start, i).trim());
+          if (!textEntry) { textEntry = [uniqueKey("text"), null]; entries.push(textEntry); }
+        } else {
+          unnamed++;
+          entries.push([uniqueKey(unnamed === 1 ? "value" : "value_" + unnamed), v]);
+          structured++;
+        }
+      }
+      ws();
+    }
+    if (!structured) fail("no struct, JSON or key=value data found");
+    if (textEntry) textEntry[1] = JSON.stringify(textParts.join(" "));
+    if (entries.length === 1 && entries[0][0] === "value") return entries[0][1];
+    return "{" + entries.map(function (e) { return JSON.stringify(e[0]) + ":" + e[1]; }).join(",") + "}";
+  }
+
+  // Non-JSON input -> { text: JSON text, note } using the best matching format.
+  // Returns null when the input just looks like broken JSON (so the caller can
+  // report the precise JSON error); throws when it looks like Rust output but
+  // cannot be converted.
+  function convertToJson(text) {
+    var fixed = quoteBareKeys(text);
+    if (fixed !== text) {
+      try { JSON.parse(fixed); return { text: fixed, note: "quoted bare keys" }; } catch (e) {}
+    }
+    var err1 = null;
+    try {
+      var d = tryDebug(text);
+      if (d !== null) return { text: d, note: "Rust debug converted" };
+    } catch (e) { err1 = e; }
+    try {
+      var lt = looseToJson(text);
+      return { text: lt, note: "Rust struct / log format converted" + (looseTruncated ? " (missing closing quote added)" : "") };
+    } catch (e2) {
+      var jsonish = /^\s*(?:\{\s*["}]|\[\s*["\]\[{\d\-]|\[\s*(?:true|false|null)\b)/.test(text);
+      if (jsonish && !err1) return null;
+      throw err1 || e2;
+    }
+  }
+  // ---- rust debug end
+
+  // ---------------------------------------------------------------------------
+  // Editor: a textarea laid over a syntax-highlighted copy of its text, with line
+  // numbers, word wrap, and Find / Replace (case, whole word, regex, replace all).
+  // ---------------------------------------------------------------------------
+  var EDITOR_HTML =
+    '<div class="find" role="search">' +
+      '<div class="row">' +
+        '<input type="text" class="f-find" placeholder="Find" aria-label="Find" spellcheck="false" autocomplete="off" autocapitalize="off">' +
+        '<button type="button" class="toggle f-case" aria-pressed="false" title="Match case" aria-label="Match case">Aa</button>' +
+        '<button type="button" class="toggle f-word" aria-pressed="false" title="Whole word" aria-label="Whole word">W</button>' +
+        '<button type="button" class="toggle f-rx" aria-pressed="false" title="Regular expression" aria-label="Regular expression">.*</button>' +
+        '<span class="cnt f-cnt"></span>' +
+        '<button type="button" class="f-prev" title="Previous match (Shift+Enter)" aria-label="Previous match">&#8593;</button>' +
+        '<button type="button" class="f-next" title="Next match (Enter)" aria-label="Next match">&#8595;</button>' +
+        '<button type="button" class="toggle f-tog" aria-pressed="false" title="Show replace (Ctrl/\u2318+H)" aria-label="Toggle replace">Replace</button>' +
+        '<button type="button" class="f-close" title="Close (Esc)" aria-label="Close find">&#10005;</button>' +
+      '</div>' +
+      '<div class="row rep-row">' +
+        '<input type="text" class="f-repl" placeholder="Replace with" aria-label="Replace with" spellcheck="false" autocomplete="off" autocapitalize="off">' +
+        '<button type="button" class="f-one">Replace</button>' +
+        '<button type="button" class="f-all">Replace all</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="edwrap"><div class="scroller"><div class="stack">' +
+      '<div class="ml" aria-hidden="true"></div>' +
+      '<div class="hl" aria-hidden="true"></div>' +
+      '<textarea spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off"></textarea>' +
+    '</div></div>' +
+    '<div class="foldbar"><span>Folded view is read-only</span><button type="button" class="f-unfold">Unfold all</button></div>' +
+    '</div>';
+
+  // Foldable regions: multi-line {...}, [...] and (...) blocks, keyed by start line.
+  // Brackets inside "strings" are ignored; a string never spans lines.
+  function computeRegions(lines) {
+    var map = new Map(), stack = [];
+    for (var i = 0; i < lines.length; i++) {
+      var L = lines[i], inStr = false;
+      for (var j = 0; j < L.length; j++) {
+        var c = L.charCodeAt(j);
+        if (inStr) { if (c === 92) j++; else if (c === 34) inStr = false; continue; }
+        if (c === 34) { inStr = true; continue; }
+        if (c === 123 || c === 91 || c === 40) stack.push({ ch: c, line: i });
+        else if (c === 125 || c === 93 || c === 41) {
+          var want = c === 125 ? 123 : c === 93 ? 91 : 40;
+          for (var k = stack.length - 1; k >= 0; k--) {
+            if (stack[k].ch === want) {
+              var o = stack[k]; stack.length = k;
+              if (i > o.line && (!map.has(o.line) || map.get(o.line) < i)) map.set(o.line, i);
+              break;
+            }
+          }
+        }
+      }
+    }
+    return map;
+  }
+
+  // Expands $&, $$, $1..$99 and $<name> in a replacement string for match m.
+  function expandReplacement(repl, m) {
+    return repl.replace(/\$(\$|&|\d{1,2}|<[^>]*>)/g, function (all, t) {
+      if (t === "$") return "$";
+      if (t === "&") return m[0];
+      if (t.charAt(0) === "<") return (m.groups && m.groups[t.slice(1, -1)]) || "";
+      var k = +t;
+      return k > 0 && k < m.length ? (m[k] === undefined ? "" : m[k]) : all;
+    });
+  }
+
+  function makeEditor(host, opts) {
+    host.innerHTML = EDITOR_HTML;
+    var q = function (s) { return host.querySelector(s); };
+    var findBox = q(".find"), fIn = q(".f-find"), rIn = q(".f-repl"), cnt = q(".f-cnt");
+    var bCase = q(".f-case"), bWord = q(".f-word"), bRx = q(".f-rx"), bTog = q(".f-tog");
+    var scroller = q(".scroller"), ml = q(".ml"), hl = q(".hl"), ta = q("textarea");
+    var BIG = 1500000;              // above this many characters: plain text, no highlighting
+    var MAX_MATCHES = 10000;
+    var text = "", ranges = [], cur = -1, capped = false, from = null, raf = 0, listeners = [];
+    var lines = [], starts = [], regions = new Map(), folded = new Set(), regionsText = null, foldListeners = [];
+    ta.placeholder = (opts && opts.placeholder) || "";
+
+    function isOn(b) { return b.getAttribute("aria-pressed") === "true"; }
+    function setOn(b, on) { b.setAttribute("aria-pressed", on ? "true" : "false"); }
+
+    // ---- rendering --------------------------------------------------------
+    function render() {
+      raf = 0;
+      text = ta.value;
+      if (text.length > BIG) {
+        host.classList.add("plain");
+        host.style.removeProperty("--gutter");
+        lines = []; starts = []; regions = new Map(); folded.clear(); regionsText = null;
+        hl.textContent = text + "\n";
+        host.classList.remove("folded"); ta.readOnly = false;
+        notifyFold();
+      } else {
+        host.classList.remove("plain");
+        lines = text.split("\n");
+        starts = new Array(lines.length);
+        for (var i = 0, off = 0; i < lines.length; i++) { starts[i] = off; off += lines[i].length + 1; }
+        if (text !== regionsText) { regions = computeRegions(lines); regionsText = text; folded.clear(); }
+        host.style.setProperty("--gutter", "calc(" + Math.max(2, String(lines.length).length) + "ch + 40px)");
+        paintLines();
+      }
+      if (findBox.classList.contains("open")) search();
+    }
+
+    // Draws the visible lines. Lines inside a folded block are left out; the
+    // block's first line shows "…" and the closing bracket instead.
+    function paintLines() {
+      var out = [], hidden = -1;
+      for (var i = 0; i < lines.length; i++) {
+        if (i <= hidden) continue;
+        var isReg = regions.has(i), isF = isReg && folded.has(i), inner;
+        if (isF) {
+          var e = regions.get(i);
+          inner = highlight(lines[i]) + '<span class="fold-ph" data-l="' + i + '" title="Click to unfold">\u2026</span>' + highlight(lines[e].replace(/^\s+/, ""));
+          hidden = e;
+        } else inner = highlight(lines[i]);
+        out.push('<div class="ln" data-n="' + (i + 1) + '">' +
+          (isReg ? '<span class="fold ' + (isF ? "closed" : "open") + '" data-l="' + i + '" title="' + (isF ? "Unfold" : "Fold") + '"></span>' : "") +
+          inner + "</div>");
+      }
+      hl.innerHTML = out.join("");
+      var has = folded.size > 0;
+      host.classList.toggle("folded", has);
+      ta.readOnly = has;
+      notifyFold();
+    }
+
+    function notifyFold() {
+      for (var i = 0; i < foldListeners.length; i++) foldListeners[i]({ folded: folded.size > 0, regions: regions.size });
+    }
+    function lineOf(idx) {
+      var lo = 0, hi = starts.length - 1;
+      while (lo < hi) { var mid = (lo + hi + 1) >> 1; if (starts[mid] <= idx) lo = mid; else hi = mid - 1; }
+      return lo;
+    }
+    function applyFold() {
+      var wasFocused = document.activeElement === ta;
+      paintLines();
+      renderMatches();
+      if (folded.size > 0) { if (wasFocused) { ta.blur(); q(".f-unfold").focus(); } }
+    }
+    function toggleFold(line) {
+      if (!regions.has(line)) return;
+      if (folded.has(line)) folded.delete(line); else folded.add(line);
+      var nowOpen = folded.size === 0;
+      applyFold();
+      if (nowOpen) ta.focus({ preventScroll: true });
+    }
+    function foldAll() {
+      if (!regions.size) return;
+      var keys = Array.from(regions.keys()).sort(function (a, b) { return a - b; });
+      // Keep the root block (the one wrapping the whole document) open when there is more to fold.
+      var first = 0; while (first < lines.length && !lines[first].trim()) first++;
+      var last = lines.length - 1; while (last > 0 && !lines[last].trim()) last--;
+      var skipRoot = keys.length > 1 && regions.get(first) === last ? first : -1;
+      folded.clear();
+      keys.forEach(function (k) { if (k !== skipRoot) folded.add(k); });
+      applyFold();
+    }
+    function unfoldAll() {
+      if (!folded.size) return;
+      folded.clear();
+      applyFold();
+      ta.focus({ preventScroll: true });
+    }
+    // Unfolds whatever hides the given line. Returns true when something changed.
+    function ensureVisible(ln) {
+      var changed = false;
+      folded.forEach(function (st) { if (st < ln && ln <= regions.get(st)) { folded.delete(st); changed = true; } });
+      if (changed) { paintLines(); renderMatches(); }
+      return changed;
+    }
+
+    function renderNow() { if (raf) { cancelAnimationFrame(raf); raf = 0; } render(); }
+    function schedule() { if (!raf) raf = requestAnimationFrame(render); }
+
+    ta.addEventListener("input", function () {
+      schedule();
+      for (var i = 0; i < listeners.length; i++) listeners[i]();
+    });
+    // The textarea is exactly as tall as its content, so it should never scroll itself.
+    ta.addEventListener("scroll", function () { ta.scrollTop = 0; ta.scrollLeft = 0; });
+
+    // ---- find -------------------------------------------------------------
+    function compile() {
+      var qv = fIn.value;
+      if (!qv) return null;
+      var src = isOn(bRx) ? qv : qv.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      if (isOn(bWord)) src = "\\b(?:" + src + ")\\b";
+      try { return new RegExp(src, "gm" + (isOn(bCase) ? "" : "i")); } catch (e) { return e; }
+    }
+
+    function statusText() {
+      if (!ranges.length) return "";
+      return (cur + 1) + " of " + ranges.length + (capped ? "+" : "");
+    }
+
+    function renderMatches() {
+      if (host.classList.contains("plain") || !ranges.length) { ml.innerHTML = ""; return; }
+      var out = [], ri = 0, hidden = -1;
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i], off = starts[i], end = off + line.length, html = "", p = off;
+        while (ri < ranges.length && ranges[ri].e <= off) ri++;
+        if (i <= hidden) continue;
+        for (var r = ri; r < ranges.length && ranges[r].s < end; r++) {
+          var a = Math.max(ranges[r].s, off), b = Math.min(ranges[r].e, end);
+          if (a > p) html += esc(text.slice(p, a));
+          if (b > a) html += '<mark data-i="' + r + '"' + (r === cur ? ' class="cur"' : "") + ">" + esc(text.slice(a, b)) + "</mark>";
+          p = Math.max(p, b);
+        }
+        if (p < end) html += esc(text.slice(p, end));
+        if (regions.has(i) && folded.has(i)) {
+          var e2 = regions.get(i);
+          html += "\u2026" + esc(lines[e2].replace(/^\s+/, ""));
+          hidden = e2;
+        }
+        out.push('<div class="ln">' + html + "</div>");
+      }
+      ml.innerHTML = out.join("");
+    }
+
+    function search() {
+      var re = compile(), status = "", none = false;
+      ranges = []; cur = -1; capped = false;
+      if (re instanceof Error) { status = "Invalid regex"; none = true; }
+      else if (re) {
+        var m;
+        while ((m = re.exec(text)) !== null) {
+          if (m[0] === "") { re.lastIndex++; continue; }
+          if (ranges.length >= MAX_MATCHES) { capped = true; break; }
+          ranges.push({ s: m.index, e: m.index + m[0].length });
+        }
+        if (ranges.length) {
+          var pos = from !== null ? from : ta.selectionStart;
+          cur = 0;
+          for (var k = 0; k < ranges.length; k++) { if (ranges[k].s >= pos) { cur = k; break; } }
+          status = statusText();
+        } else { status = "No results"; none = true; }
+      }
+      from = null;
+      cnt.textContent = status;
+      cnt.classList.toggle("none", none);
+      renderMatches();
+    }
+
+    function reveal() {
+      var mk = ml.querySelector("mark.cur");
+      if (!mk) return;
+      var r = mk.getBoundingClientRect(), s = scroller.getBoundingClientRect();
+      if (r.top < s.top + 24 || r.bottom > s.bottom - 24) scroller.scrollTop += r.top - s.top - s.height / 3;
+      if (r.left < s.left + 24 || r.right > s.right - 24) scroller.scrollLeft += r.left - s.left - s.width / 3;
+    }
+
+    function go(k, doReveal) {
+      if (!ranges.length) return;
+      cur = (k + ranges.length) % ranges.length;
+      ensureVisible(lineOf(ranges[cur].s));
+      var olds = ml.querySelectorAll("mark.cur");
+      for (var i = 0; i < olds.length; i++) olds[i].classList.remove("cur");
+      var news = ml.querySelectorAll('mark[data-i="' + cur + '"]');
+      for (var j = 0; j < news.length; j++) news[j].classList.add("cur");
+      try { ta.setSelectionRange(ranges[cur].s, ranges[cur].e); } catch (e) {}
+      cnt.textContent = statusText();
+      if (doReveal !== false) reveal();
+    }
+
+    function refresh() { search(); if (ranges.length) go(cur, true); }
+
+    function edit(s, e, str) {
+      var prev = document.activeElement;
+      ta.focus({ preventScroll: true });
+      ta.setSelectionRange(s, e);
+      var ok = false;
+      try { ok = str === "" ? document.execCommand("delete") : document.execCommand("insertText", false, str); } catch (x) {}
+      if (!ok) { ta.setRangeText(str, s, e, "end"); ta.dispatchEvent(new Event("input", { bubbles: true })); }
+      if (prev && prev !== ta && prev.focus) prev.focus({ preventScroll: true });
+    }
+
+    function replaceOne() {
+      unfoldAll();
+      var re = compile();
+      if (!re || re instanceof Error || cur < 0) return;
+      var r = ranges[cur], rep = rIn.value;
+      if (isOn(bRx)) {
+        var y = new RegExp(re.source, re.flags.replace("g", "") + "y");
+        y.lastIndex = r.s;
+        var m = y.exec(ta.value);
+        if (m) rep = expandReplacement(rIn.value, m);
+      }
+      from = r.s + rep.length;
+      edit(r.s, r.e, rep);
+      renderNow();
+      if (ranges.length) go(cur, true);
+    }
+
+    function replaceAll() {
+      unfoldAll();
+      var re = compile();
+      if (!re || re instanceof Error) return;
+      var src = ta.value, out = "", last = 0, n = 0, m;
+      re.lastIndex = 0;
+      while ((m = re.exec(src)) !== null) {
+        if (m[0] === "") { re.lastIndex++; continue; }
+        out += src.slice(last, m.index) + (isOn(bRx) ? expandReplacement(rIn.value, m) : rIn.value);
+        last = m.index + m[0].length;
+        n++;
+      }
+      if (!n) return;
+      out += src.slice(last);
+      edit(0, src.length, out);
+      renderNow();
+      cnt.textContent = "Replaced " + n;
+    }
+
+    function openFind(withReplace) {
+      findBox.classList.add("open");
+      if (withReplace) findBox.classList.add("rep");
+      setOn(bTog, findBox.classList.contains("rep"));
+      var sel = ta.value.slice(ta.selectionStart, ta.selectionEnd);
+      if (sel && sel.indexOf("\n") < 0 && sel.length <= 200) fIn.value = sel;
+      renderNow();
+      (withReplace && fIn.value ? rIn : fIn).focus();
+      (withReplace && fIn.value ? rIn : fIn).select();
+    }
+    function closeFind() {
+      findBox.classList.remove("open");
+      ranges = []; cur = -1; ml.innerHTML = "";
+      ta.focus({ preventScroll: true });
+    }
+
+    hl.addEventListener("click", function (e) {
+      var t = e.target.closest ? e.target.closest(".fold, .fold-ph") : null;
+      if (t) toggleFold(+t.getAttribute("data-l"));
+    });
+    hl.addEventListener("mousedown", function (e) {
+      if (e.target.closest && e.target.closest(".fold")) e.preventDefault();   // keep focus where it is
+    });
+    q(".f-unfold").addEventListener("click", unfoldAll);
+
+    fIn.addEventListener("input", refresh);
+    [bCase, bWord, bRx].forEach(function (b) {
+      b.addEventListener("click", function () { setOn(b, !isOn(b)); refresh(); fIn.focus(); });
+    });
+    bTog.addEventListener("click", function () {
+      var on = !findBox.classList.contains("rep");
+      findBox.classList.toggle("rep", on); setOn(bTog, on);
+      (on ? rIn : fIn).focus();
+    });
+    q(".f-next").addEventListener("click", function () { if (!ranges.length) search(); go(cur + 1); });
+    q(".f-prev").addEventListener("click", function () { if (!ranges.length) search(); go(cur - 1); });
+    q(".f-close").addEventListener("click", closeFind);
+    q(".f-one").addEventListener("click", replaceOne);
+    q(".f-all").addEventListener("click", replaceAll);
+    fIn.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); if (!ranges.length) search(); go(cur + (e.shiftKey ? -1 : 1)); }
+    });
+    rIn.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); if (e.ctrlKey || e.metaKey) replaceAll(); else replaceOne(); }
+    });
+    host.addEventListener("keydown", function (e) {
+      var mod = e.ctrlKey || e.metaKey;
+      if (mod && !e.altKey && e.code === "KeyF") { e.preventDefault(); openFind(false); }
+      else if ((mod && !e.altKey && e.code === "KeyH") || (e.metaKey && e.altKey && e.code === "KeyF")) { e.preventDefault(); openFind(true); }
+      else if (mod && e.shiftKey && e.code === "BracketLeft") {          // fold the block around the caret
+        e.preventDefault();
+        var ln = lineOf(ta.selectionStart), best = -1;
+        regions.forEach(function (end, st) { if (st <= ln && ln < end && !folded.has(st) && st > best) best = st; });
+        if (best >= 0) { folded.add(best); applyFold(); }
+      }
+      else if (mod && e.shiftKey && e.code === "BracketRight") { e.preventDefault(); unfoldAll(); }
+      else if (e.key === "F3") { e.preventDefault(); if (!ranges.length) search(); go(cur + (e.shiftKey ? -1 : 1)); }
+      else if (e.key === "Escape" && findBox.classList.contains("open")) { e.preventDefault(); closeFind(); }
+    });
+
+    // ---- public API -------------------------------------------------------
+    render();
+    return {
+      getValue: function () { return ta.value; },
+      setValue: function (t) {
+        ta.value = t;
+        try { ta.setSelectionRange(0, 0); } catch (e) {}
+        scroller.scrollTop = 0; scroller.scrollLeft = 0;
+        renderNow();
+      },
+      setSelection: function (a, b) { try { ta.setSelectionRange(a, b); } catch (e) {} },
+      focus: function () { ta.focus(); },
+      onInput: function (fn) { listeners.push(fn); },
+      openFind: openFind,
+      setWrap: function (on) {
+        host.classList.toggle("wrap", on);
+        ta.setAttribute("wrap", on ? "soft" : "off");
+      },
+      scrollToIndex: function (i) {
+        var line = lineOf(i);
+        ensureVisible(line);
+        var el = hl.querySelector('.ln[data-n="' + (line + 1) + '"]');
+        if (el) scroller.scrollTop = Math.max(0, el.offsetTop - scroller.clientHeight / 3);
+      },
+      foldAll: foldAll,
+      unfoldAll: unfoldAll,
+      hasFolds: function () { return folded.size > 0; },
+      onFold: function (fn) { foldListeners.push(fn); fn({ folded: folded.size > 0, regions: regions.size }); }
+    };
+  }
+
+  function unitFor(v) { return v === "tab" ? "\t" : " ".repeat(parseInt(v, 10)); }
+
+  function locate(text, err) {
+    var msg = String(err && err.message || err);
+    var pos = null, line = null, col = null, m;
+    if ((m = msg.match(/line (\d+) column (\d+)/i))) { line = +m[1]; col = +m[2]; }
+    if ((m = msg.match(/position (\d+)/i))) { pos = +m[1]; }
+    if (pos === null && line !== null) {
+      var lines = text.split("\n"), p = 0;
+      for (var i = 0; i < line - 1 && i < lines.length; i++) p += lines[i].length + 1;
+      pos = p + col - 1;
+    }
+    if (pos !== null && line === null) {
+      var before = text.slice(0, pos).split("\n");
+      line = before.length; col = before[before.length - 1].length + 1;
+    }
+    return { msg: msg, pos: pos, line: line, col: col };
+  }
+
+  function showError(text, err) {
+    var loc = locate(text, err);
+    var where = loc.line ? " (line " + loc.line + ", column " + loc.col + ")" : "";
+    var snippet = "";
+    if (loc.line) {
+      var l = text.split("\n")[loc.line - 1] || "";
+      if (l.length > 120) l = l.slice(Math.max(0, loc.col - 60), loc.col + 60);
+      snippet = "<br><code>" + esc(l) + "</code>";
+    }
+    errorBox.innerHTML = "<strong>Invalid JSON" + where + ".</strong> " + esc(loc.msg.replace(/^JSON\.parse: /, "")) + snippet;
+    errorBox.classList.add("show");
+    if (loc.pos !== null && text === inEd.getValue()) {
+      inEd.setSelection(loc.pos, Math.min(loc.pos + 1, text.length));
+      inEd.focus();
+      inEd.scrollToIndex(loc.pos);
+    }
+  }
+
+  function showPlain(msg) {
+    errorBox.innerHTML = "<strong>Conversion failed.</strong> " + esc(msg);
+    errorBox.classList.add("show");
+  }
+
+  function clearError() { errorBox.classList.remove("show"); errorBox.textContent = ""; }
+
+  function setOutput(text, label) {
+    outEd.setValue(text);
+    outMeta.className = "meta ok";
+    outMeta.textContent = label + " · " + fmtBytes(new Blob([text]).size);
+    outMeta.title = outMeta.textContent;
+    copyBtn.disabled = false;
+  }
+
+  function resetOutput() {
+    outEd.setValue("");
+    outMeta.textContent = "";
+    outMeta.className = "meta";
+    copyBtn.disabled = true;
+    setMode("format");
+  }
+
+  // Live validity for the (editable) output pane.
+  var validateTimer = null;
+  function onOutputEdited() {
+    copyBtn.disabled = !outEd.getValue();
+    clearTimeout(validateTimer);
+    validateTimer = setTimeout(function () {
+      var t = outEd.getValue();
+      if (!t.trim()) { outMeta.textContent = ""; outMeta.className = "meta"; return; }
+      var size = fmtBytes(new Blob([t]).size);
+      try { JSON.parse(t); outMeta.className = "meta ok"; outMeta.textContent = "Valid · edited · " + size; }
+      catch (e) {
+        var loc = locate(t, e);
+        outMeta.className = "meta bad";
+        outMeta.textContent = "Invalid JSON" + (loc.line ? " · line " + loc.line + ", col " + loc.col : "") + " · edited";
+      }
+    }, 250);
+  }
+
+  // Re-indent / minify the text currently in the output pane (keeps manual edits).
+  function reflow(mode) {
+    var t = outEd.getValue().trim();
+    if (!t) return false;
+    try { JSON.parse(t); }
+    catch (e) {
+      var loc = locate(t, e);
+      outMeta.className = "meta bad";
+      outMeta.textContent = "Can't " + (mode === "minify" ? "minify" : "expand") + ": invalid JSON" + (loc.line ? " · line " + loc.line + ", col " + loc.col : "");
+      return true;
+    }
+    var out = rewrite(t, mode === "minify" ? null : unitFor(indentSel.value));
+    outEd.setValue(out);
+    outMeta.className = "meta ok";
+    outMeta.textContent = (mode === "minify" ? "Minified" : "Valid") + " · " + fmtBytes(new Blob([out]).size);
+    copyBtn.disabled = false;
+    setMode(mode);
+    return true;
+  }
+
+  function apply(mode) {
+    if (!inputDirty && reflow(mode)) return;
+    run(mode);
+  }
+
+  function run(mode) {
+    var text = inEd.getValue().trim();
+    clearError();
+    if (!text) { resetOutput(); return; }
+    var label = mode === "minify" ? "Minified" : "Valid";
+    var jsonOk = true, jsonErr;
+    try { JSON.parse(text); } catch (e) { jsonOk = false; jsonErr = e; }
+
+    if (!jsonOk) {
+      // Not JSON: try bare keys, Rust serde_json debug, Rust struct debug, key=value logs.
+      var conv;
+      try { conv = convertToJson(text); }
+      catch (e) { showPlain("Could not convert this input: " + e.message); resetOutput(); return; }
+      if (!conv) { showError(inEd.getValue(), jsonErr); resetOutput(); return; }
+      text = conv.text;
+      label += " · " + conv.note;
+    }
+
+    // Expand string fields holding JSON or Rust debug output, at any depth.
+    var ctx = { texts: [], dbg: 0, json: 0 }, walked;
+    try { walked = expandDebug(JSON.parse(protectNumbers(text)), ctx); }
+    catch (e) { showError(text, e); resetOutput(); return; }
+    if (ctx.texts.length) {
+      text = splice(JSON.stringify(walked), ctx);
+      if (ctx.json) label += " · nested JSON expanded";
+      if (ctx.dbg) label += " · Rust debug converted";
+    }
+
+    try { JSON.parse(text); } catch (e) { showError(text, e); resetOutput(); return; }
+    var unit = mode === "minify" ? null : unitFor(indentSel.value);
+    setOutput(rewrite(text, unit), label);
+    setMode(mode);
+    inputDirty = false;
+  }
+
+  function copy(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text).catch(function () { return legacyCopy(text); });
+    }
+    return legacyCopy(text);
+  }
+  function legacyCopy(text) {
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement("textarea");
+      ta.value = text; ta.setAttribute("readonly", "");
+      ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+      document.body.appendChild(ta); ta.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) {}
+      document.body.removeChild(ta);
+      ok ? resolve() : reject(new Error("copy failed"));
+    });
+  }
+
+  copyBtn.addEventListener("click", function () {
+    var t = outEd.getValue();
+    if (!t) return;
+    copy(t).then(function () {
+      copyBtn.textContent = "Copied"; copyBtn.classList.add("done");
+    }).catch(function () {
+      copyBtn.textContent = "Copy failed";
+    }).then(function () {
+      clearTimeout(copyTimer);
+      copyTimer = setTimeout(function () {
+        copyBtn.textContent = "Copy"; copyBtn.classList.remove("done");
+      }, 1600);
+    });
+  });
+
+  // Editors (created last: they need the highlighter defined above).
+  inEd = makeEditor($("inHost"), {
+    placeholder: "Paste JSON, JSON inside strings, Rust debug output ({:?}) or key=value log lines here, then choose Format."
+  });
+  outEd = makeEditor($("outHost"), {
+    placeholder: "The formatted JSON appears here. It is editable, and Find / Replace works on both sides."
+  });
+  inEd.onInput(function () {
+    inputDirty = true;
+    var v = inEd.getValue();
+    inMeta.textContent = v ? fmtBytes(new Blob([v]).size) : "";
+  });
+  outEd.onInput(onOutputEdited);
+  [[inEd, $("inFold")], [outEd, $("outFold")]].forEach(function (pair) {
+    var ed = pair[0], btn = pair[1];
+    ed.onFold(function (st) {
+      btn.textContent = st.folded ? "Unfold all" : "Fold all";
+      btn.disabled = !st.folded && st.regions === 0;
+    });
+    btn.addEventListener("click", function () { if (ed.hasFolds()) ed.unfoldAll(); else ed.foldAll(); });
+  });
+  $("inFind").addEventListener("click", function () { inEd.openFind(false); });
+  $("outFind").addEventListener("click", function () { outEd.openFind(false); });
+
+  $("format").addEventListener("click", function () { run("format"); });
+  minifyBtn.addEventListener("click", function () {
+    apply(currentMode === "minify" ? "format" : "minify");
+  });
+  wrapBtn.addEventListener("click", function () {
+    setWrap(wrapBtn.getAttribute("aria-pressed") !== "true");
+  });
+  try { if (localStorage.getItem("jsonFormatterWrap") === "1") setWrap(true); } catch (e) {}
+  $("clear").addEventListener("click", function () {
+    inEd.setValue(""); clearError(); resetOutput(); inMeta.textContent = ""; inputDirty = false; inEd.focus();
+  });
+  indentSel.addEventListener("change", function () {
+    if (outEd.getValue() && currentMode === "format") apply("format");
+  });
+  document.addEventListener("keydown", function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); run("format"); }
+  });
+})();
+</script>
+</body>
+</html>
