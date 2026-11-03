@@ -574,6 +574,7 @@
         return num;
       }
       if (peek("String(")) { eat("String("); var s = rustString(); eat(")"); return s; }
+      if (src[i] === '"') return rustString(); // Option<String>: Some("...")
       if (peek("Array")) {
         eat("Array"); eat("[");
         var items = [];
@@ -603,7 +604,7 @@
   }
 
   // Also matches the JSON-escaped form: Some(Object {\"a\": String(\"x\")})
-  var DEBUG_START = /^\s*(?:Some\(\s*)?(?:Object\s*\{|Array\s*\[|String\(\s*\\?"|Number\(|Bool\(|Null\b)/;
+  var DEBUG_START = /^\s*(?:Some\(\s*\\?"|(?:Some\(\s*)?(?:Object\s*\{|Array\s*\[|String\(\s*\\?"|Number\(|Bool\(|Null\b))/;
   function looksLikeDebug(s) { return DEBUG_START.test(s); }
 
   // Raw pasted debug text. Returns null when the text isn't debug output,
@@ -644,7 +645,18 @@
         }
       }
       if (looksLikeDebug(v)) {
-        try { ctx.texts.push(debugToJson(v)); ctx.dbg++; return "@@DBG" + (ctx.texts.length - 1) + "@@"; } catch (err) {}
+        var conv;
+        try { conv = debugToJson(v); } catch (err) { conv = null; }
+        if (conv !== null) {
+          ctx.dbg++;
+          // Some("{...}") decodes to a plain string: it may itself hold JSON / debug text.
+          if (conv.charAt(0) === '"') {
+            var decoded = JSON.parse(conv), deeper = expandDebug(decoded, ctx);
+            if (deeper !== decoded) return deeper;
+          }
+          ctx.texts.push(conv);
+          return "@@DBG" + (ctx.texts.length - 1) + "@@";
+        }
       }
       return v;
     }
