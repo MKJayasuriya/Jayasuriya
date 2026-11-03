@@ -421,7 +421,7 @@
   /* ── Topics (radiogroup) ─────────────────────── */
 
   function setupTopics() {
-    var group = $("[role='radiogroup']");
+    var group = $(".topic-group[role='radiogroup']");
     if (!group) return;
 
     var currentTopic = TOPICS[0];

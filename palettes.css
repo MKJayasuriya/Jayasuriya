@@ -1,0 +1,112 @@
+/* ── Accent palettes ("Tweaks") ─────────────────────────────────
+   Each palette supplies a light and a dark accent. The generic rules
+   below map them onto --accent/--live/--sel for whichever colour
+   scheme is active. "green" is the original and defines no overrides.
+   Diff semantics (--add-*, --rem-*) are deliberately left untouched. */
+
+:root[data-palette="ink"]        { --pal-l: #1f4e8c; --pal-d: #7aa9e6; }
+:root[data-palette="terracotta"] { --pal-l: #b4492a; --pal-d: #e8906f; }
+:root[data-palette="plum"]       { --pal-l: #7a2e6b; --pal-d: #d89acb; }
+:root[data-palette="slate"]      { --pal-l: #3e4a56; --pal-d: #a9b6c3; }
+:root[data-palette="teal"]       { --pal-l: #0e6f78; --pal-d: #5ccfd6; }
+:root[data-palette="saffron"]    { --pal-l: #a45f00; --pal-d: #f0b84a; }
+
+:root[data-palette]:not([data-palette="green"]) {
+  --accent: var(--pal-l);
+  --live: var(--pal-l);
+}
+
+:root[data-palette]:not([data-palette="green"])[data-theme="dark"] {
+  --accent: var(--pal-d);
+  --live: var(--pal-d);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-palette]:not([data-palette="green"]):not([data-theme="light"]) {
+    --accent: var(--pal-d);
+    --live: var(--pal-d);
+  }
+}
+
+/* ── Picker UI ──────────────────────────────────────────────── */
+.pal { position: relative; display: inline-flex; }
+
+.pal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--muted);
+}
+.pal-btn:hover, .pal-btn[aria-expanded="true"] { color: var(--ink); }
+.pal-btn:focus-visible, .pal-opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.pal-sw {
+  --sw: var(--sw-l);
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--sw);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 35%, transparent);
+  flex: none;
+}
+:root[data-theme="dark"] .pal-sw { --sw: var(--sw-d); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pal-sw { --sw: var(--sw-d); }
+}
+
+.pal-menu {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 100;
+  min-width: 190px;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  box-shadow: 0 18px 40px -18px color-mix(in oklab, var(--ink) 55%, transparent);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+}
+.pal-menu[hidden] { display: none; }
+
+.pal-head {
+  padding: 4px 8px 8px;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.pal-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ink2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pal-opt:hover { background: color-mix(in oklab, var(--accent) 12%, transparent); color: var(--ink); }
+.pal-opt[aria-checked="true"] { color: var(--ink); }
+.pal-opt[aria-checked="true"]::after { content: "✓"; margin-left: auto; color: var(--accent); }
+
+@media (max-width: 560px) {
+  .pal-lbl { display: none; }
+  .pal-menu { right: -8px; }
+}

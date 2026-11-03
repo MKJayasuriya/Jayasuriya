@@ -14,7 +14,7 @@
   --hdr: rgba(247, 245, 238, 0.66);
   --glass: rgba(255, 255, 253, 0.62);
   --glassLine: rgba(20, 32, 26, 0.14);
-  --glassShadow: 0 34px 60px -34px rgba(31, 107, 74, 0.42),
+  --glassShadow: 0 34px 60px -34px color-mix(in oklab, var(--accent) 42%, transparent),
                  0 2px 6px -2px rgba(20, 32, 26, 0.08),
                  inset 0 1px 0 rgba(255, 255, 255, 0.9);
   --glowA: color-mix(in oklab, var(--accent) 55%, transparent);
@@ -55,7 +55,7 @@
   /* Search markers and selection */
   --mk: #fae498;
   --mk-cur: #f5af52;
-  --sel: rgba(31, 107, 74, 0.22);
+  --sel: color-mix(in oklab, var(--accent) 22%, transparent);
 
   /* Layout dimensions */
   --site-header-h: 53px;
@@ -113,7 +113,7 @@
 
     --mk: #544111;
     --mk-cur: #9c6014;
-    --sel: rgba(111, 199, 156, 0.28);
+    --sel: color-mix(in oklab, var(--accent) 28%, transparent);
   }
 }
 
@@ -165,7 +165,7 @@
 
   --mk: #544111;
   --mk-cur: #9c6014;
-  --sel: rgba(111, 199, 156, 0.28);
+  --sel: color-mix(in oklab, var(--accent) 28%, transparent);
 }
 
 :root[data-theme="light"] {
